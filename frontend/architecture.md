@@ -7,10 +7,13 @@ Frontend stack:
 - Vite
 - React Admin
 - shadcn/ui
+- Keycloak JS
 
 The frontend is generated from the DSL and API specification.
 
 Each entity becomes a React Admin resource.
+
+The generated frontend must also include Keycloak authentication by default.
 
 ---
 
@@ -20,6 +23,17 @@ client/
   src/
 
     App.tsx
+
+    main.tsx
+
+    dataProvider.ts
+
+    auth/
+      keycloak.ts
+      authProvider.ts
+
+    config/
+      env.ts
 
     resources/
 
@@ -35,6 +49,13 @@ client/
 
 Each resource must be registered in App.tsx.
 
+The generated `App.tsx` must register:
+
+- `dataProvider`
+- `authProvider`
+
+The generated `Admin` root must enforce authenticated operation. The generated frontend must not operate anonymously once auth is enabled.
+
 Example:
 
 <Resource
@@ -49,7 +70,7 @@ Example:
 
 # Data Provider
 
-React Admin uses the standard REST provider.
+React Admin uses a generated shared REST-compatible data provider.
 
 API format must follow:
 
@@ -65,6 +86,43 @@ List response format:
   data: [],
   total: number
 }
+
+The generated `dataProvider.ts` must remain the **single shared request seam** for backend API calls.
+
+Rules:
+
+1. Use an env-driven API base URL.
+2. Attach `Authorization: Bearer <access_token>` in this shared seam.
+3. Cover all React Admin operations, including references and bulk fetches.
+4. Do not scatter auth headers across resource components.
+
+---
+
+# Application Bootstrap
+
+The generated `main.tsx` must initialize Keycloak before rendering the SPA.
+
+Rules:
+
+1. Use redirect-based Keycloak login only.
+2. Use Authorization Code + PKCE (`S256`).
+3. Do not generate a custom in-app username/password login form.
+4. Do not render the authenticated admin app before Keycloak initialization completes.
+
+---
+
+# Config
+
+The generated frontend must include a dedicated config module in `src/config/`.
+
+Required env variables:
+
+- `VITE_API_URL`
+- `VITE_KEYCLOAK_URL`
+- `VITE_KEYCLOAK_REALM`
+- `VITE_KEYCLOAK_CLIENT_ID`
+
+The generated frontend config must fail fast if required auth variables are missing. The generated frontend must not silently fall back to production auth settings in code.
 
 ---
 

@@ -4,6 +4,55 @@ Entity attributes determine UI fields.
 
 ---
 
+# Authentication
+
+Generated React Admin applications in this repository must include an `authProvider`.
+
+Rules:
+
+1. `authProvider` is mandatory.
+2. The generated app must use redirect-based Keycloak login only.
+3. The generator must not create a custom in-app username/password form.
+4. The generated app must initialize authentication before rendering the admin UI.
+
+---
+
+# Shared Authenticated Request Layer
+
+The generated frontend must attach bearer tokens through the shared request seam in `client/src/dataProvider.ts`.
+
+Rules:
+
+1. All resource calls must use the same authenticated request layer.
+2. Reference lookups must use the same authenticated request layer.
+3. The generated frontend must not attach auth headers directly inside resource components.
+
+---
+
+# Error Handling
+
+The generated `authProvider.checkError` must distinguish authentication failures from authorization failures:
+
+- `401` -> force logout / re-authentication
+- `403` -> do not re-authenticate; surface access denied / permission error
+
+The generator must not treat `401` and `403` as the same outcome.
+
+---
+
+# Token Handling
+
+The generated frontend must use Keycloak JS token handling with these rules:
+
+1. Use Authorization Code + PKCE (`S256`).
+2. Refresh tokens before protected API calls when needed.
+3. Token refresh must be concurrency-safe:
+   - one shared in-flight refresh operation
+   - no parallel refresh stampede
+4. Do not store access tokens or refresh tokens in `localStorage` or `sessionStorage`.
+
+---
+
 # Type Mapping
 
 | DSL Type | React Admin Component |

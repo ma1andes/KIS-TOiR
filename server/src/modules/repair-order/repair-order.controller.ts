@@ -1,5 +1,7 @@
 import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Res } from '@nestjs/common';
 import { Response } from 'express';
+import { Roles } from '../../auth/decorators/roles.decorator';
+import { RealmRole } from '../../auth/roles/realm-role.enum';
 import { RepairOrderService } from './repair-order.service';
 import { CreateRepairOrderDto } from './dto/create-repair-order.dto';
 import { UpdateRepairOrderDto } from './dto/update-repair-order.dto';
@@ -8,6 +10,7 @@ import { UpdateRepairOrderDto } from './dto/update-repair-order.dto';
 export class RepairOrderController {
   constructor(private readonly repairOrderService: RepairOrderService) {}
 
+  @Roles(RealmRole.Viewer, RealmRole.Editor, RealmRole.Admin)
   @Get()
   async findAll(@Query() query: any, @Res() res: Response) {
     const result = await this.repairOrderService.findAll(query);
@@ -16,21 +19,25 @@ export class RepairOrderController {
     return res.json(result.data);
   }
 
+  @Roles(RealmRole.Viewer, RealmRole.Editor, RealmRole.Admin)
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.repairOrderService.findOne(id);
   }
 
+  @Roles(RealmRole.Editor, RealmRole.Admin)
   @Post()
   create(@Body() dto: CreateRepairOrderDto) {
     return this.repairOrderService.create(dto);
   }
 
+  @Roles(RealmRole.Editor, RealmRole.Admin)
   @Patch(':id')
   update(@Param('id') id: string, @Body() dto: UpdateRepairOrderDto) {
     return this.repairOrderService.update(id, dto);
   }
 
+  @Roles(RealmRole.Admin)
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.repairOrderService.remove(id);

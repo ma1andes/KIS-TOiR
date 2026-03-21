@@ -1,14 +1,42 @@
 # Runtime Bootstrap
 
-After project generation, the following commands must work in order so that the application runs without manual database provisioning or ad-hoc steps.
+After project generation, the following commands and prerequisites must work in order so that the application runs without ad-hoc auth or database setup.
 
-The generator must produce a **runnable development environment**: backend, frontend, and database must all be startable via a documented sequence.
+The generator must produce a **runnable development environment** consisting of:
+
+- external Keycloak identity provider
+- backend API
+- frontend SPA
+- PostgreSQL database
+
+The generator must also produce the runtime artifacts required to bootstrap auth from zero, including a root-level Keycloak realm import artifact. The repository default example filename is `toir-realm.json`, but future generations must allow a project-specific equivalent.
 
 ---
 
 # Bootstrap Sequence
 
-## 1. Start the database
+## 1. Prepare Keycloak
+
+Before starting the application, ensure an external Keycloak server is reachable and import or verify the generated realm artifact:
+
+- root-level generated Keycloak realm import artifact
+- repository default example filename: `toir-realm.json`
+
+The runtime instructions must require importing or verifying this realm before frontend/backend startup.
+
+Keycloak bootstrap expectations:
+
+- realm import is self-contained
+- frontend client exists
+- backend audience client exists
+- realm roles exist
+- issued access tokens reliably contain `sub`, `aud`, and `realm_access.roles`
+
+The generator must not rely on undeclared built-in client scopes magically existing after realm import.
+
+---
+
+## 2. Start the database
 
 From the **project root**:
 
@@ -16,11 +44,11 @@ From the **project root**:
 docker compose up -d
 ```
 
-This starts the PostgreSQL container. The backend will connect to it using `DATABASE_URL` from `server/.env`.
+This starts the PostgreSQL container. The backend connects to it using `DATABASE_URL` from `server/.env`.
 
 ---
 
-## 2. Backend setup and start
+## 3. Backend setup and start
 
 ```bash
 cd server
@@ -31,15 +59,22 @@ npx prisma db seed
 npm run start
 ```
 
-- `npm install` — installs dependencies and runs `postinstall` (e.g. `prisma generate`) if configured.
-- `npx prisma generate` — ensures Prisma client is generated explicitly after install/schema changes.
-- `npx prisma migrate dev` — creates/applies migrations and ensures the database schema exists.
-- `npx prisma db seed` — populates minimal development data for immediate UI/API usage.
-- `npm run start` — starts the NestJS server (default port e.g. 3000).
+- `npm install` installs dependencies and runs `postinstall` if configured.
+- `npx prisma generate` ensures Prisma client is generated explicitly after install or schema changes.
+- `npx prisma migrate dev` creates/applies migrations.
+- `npx prisma db seed` inserts minimal development data.
+- `npm run start` starts the NestJS server.
+
+Backend startup requirements:
+
+- required database and auth env vars must be present
+- startup must fail fast if required env vars are missing
+- CORS must support the SPA -> API bearer-token model
+- `/health` must remain public
 
 ---
 
-## 3. Frontend setup and start
+## 4. Frontend setup and start
 
 In a separate terminal, from the **project root**:
 
@@ -49,16 +84,37 @@ npm install
 npm run dev
 ```
 
-- `npm run dev` — starts the Vite dev server (e.g. http://localhost:5173).
+- `npm install` installs frontend dependencies including `keycloak-js`.
+- `npm run dev` starts the Vite dev server.
+
+Frontend startup requirements:
+
+- required Vite auth vars must be present
+- startup must fail fast if required auth vars are missing
+- Keycloak must initialize before the SPA is rendered
+- login must use redirect-based Keycloak authentication only
 
 ---
 
 # Success Criteria
 
-After running the above:
+After completing the bootstrap sequence:
 
-- Database container is running; Prisma can connect.
-- Backend responds (e.g. `GET /health` returns `{ "status": "ok" }`).
-- Frontend loads and can call the backend API.
+- Keycloak is reachable and the generated realm has been imported or verified.
+- Database container is running and Prisma can connect.
+- Backend responds on `/health` without auth.
+- Protected backend routes require a valid bearer token.
+- Frontend loads, redirects through Keycloak login when needed, and uses bearer auth for all API calls.
 
-The generator is responsible for producing all artifacts (docker-compose, schema, migrations, seed, env, health endpoint) so that this sequence succeeds without additional manual setup.
+The generator is responsible for producing all artifacts and instructions needed for this sequence:
+
+- `docker-compose.yml`
+- schema
+- migrations
+- seed
+- backend/frontend env examples
+- health endpoint
+- auth infrastructure
+- root-level Keycloak realm import artifact
+
+Docker scope must remain limited to PostgreSQL. Keycloak remains an external dependency in this repository.

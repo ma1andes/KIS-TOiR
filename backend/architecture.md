@@ -7,6 +7,7 @@ Backend stack:
 - NestJS
 - Prisma ORM
 - PostgreSQL
+- jose
 
 The backend is generated from the DSL specification.
 
@@ -31,6 +32,15 @@ schema.prisma
 src/
 main.ts
 app.module.ts
+
+    auth/
+      auth.module.ts
+      guards/
+      decorators/
+      interfaces/
+
+    config/
+      env.validation.ts
 
     modules/
 
@@ -105,6 +115,7 @@ Every generated backend must expose a **health endpoint** so that runtime and or
 ## Controller example
 
 ```typescript
+@Public()
 @Controller("health")
 export class HealthController {
   @Get()
@@ -115,6 +126,42 @@ export class HealthController {
 ```
 
 Register the health controller in the root app module (or a dedicated health module). No authentication required for this endpoint.
+
+---
+
+# Authentication and Authorization
+
+The generated backend must include explicit auth infrastructure by default.
+
+Generate:
+
+- `AuthModule`
+- JWT guard
+- roles guard
+- `@Public()`
+- `@Roles()`
+- typed authenticated principal
+- typed env validation for auth/runtime variables
+
+Rules:
+
+1. `/health` must remain public.
+2. Generated CRUD routes must be protected by default.
+3. JWT verification must use issuer + audience + JWKS.
+4. Authorization roles must be extracted only from `realm_access.roles`.
+5. The generated backend must not use deprecated Keycloak-specific Node adapters.
+
+## CRUD RBAC defaults
+
+Apply these defaults to generated CRUD controllers:
+
+- `GET` -> `viewer`, `editor`, `admin`
+- `POST` -> `editor`, `admin`
+- `PATCH` -> `editor`, `admin`
+- `PUT` -> `editor`, `admin`
+- `DELETE` -> `admin`
+
+These defaults must be encoded in generated guards/decorators, not left as informal guidance.
 
 ---
 
@@ -247,8 +294,8 @@ See **Controller Rules** above for the rule that :pk must match the entity's pri
 
 # Environment and runtime
 
-- **Environment variables:** Backend requires at least `DATABASE_URL`. See **backend/runtime-rules.md**.
-- **.env:** Generated project must include a `.env` (and `.env.example`) with `DATABASE_URL` so the app starts without runtime errors.
+- **Environment variables:** Backend requires runtime and auth variables. See **backend/runtime-rules.md**.
+- **.env:** Generated project must include a `.env` (and `.env.example`) with database, auth, and CORS variables so the app starts without runtime errors.
 - **PrismaService:** Must follow **backend/prisma-service.md** (OnModuleInit, $connect; no beforeExit).
 - **Prisma client:** Add `"postinstall": "prisma generate"` (or equivalent) to package.json so the client is generated after install.
 - **Migrations:** Document or run `npx prisma migrate dev` after schema generation. See **backend/runtime-rules.md** and **generation/backend-generation.md**.

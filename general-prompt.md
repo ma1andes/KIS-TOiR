@@ -14,6 +14,10 @@ Prisma documentation
 
 React Admin documentation
 
+Vite documentation
+
+Keycloak documentation
+
 Docker documentation
 
 The generated application must run without manual fixes.
@@ -24,7 +28,7 @@ You must read the project documentation in the following strict order:
 
 domain/dsl-spec.md
 
-examples/\*.dsl
+examples/*.dsl
 
 backend/architecture.md
 
@@ -44,6 +48,14 @@ frontend/architecture.md
 
 frontend/react-admin-rules.md
 
+auth/keycloak-architecture.md
+
+auth/frontend-auth-rules.md
+
+auth/backend-auth-rules.md
+
+auth/keycloak-realm-template-rules.md
+
 generation/scaffolding-rules.md
 
 generation/backend-generation.md
@@ -58,7 +70,9 @@ Do not ignore any rules defined in these documents.
 
 GOAL
 
-Generate a DSL-driven fullstack CRUD system.
+Generate a DSL-driven fullstack CRUD system with default Keycloak authentication and authorization.
+
+Repository-specific defaults and examples may use names such as `toir`, `toir-frontend`, `toir-backend`, `toir-realm.json`, and `*.greact.ru`, but the generator must parameterize realm name, client IDs, production URLs, and realm-artifact filename for other generated projects.
 
 Stack:
 
@@ -72,6 +86,8 @@ Prisma ORM
 
 PostgreSQL
 
+jose
+
 Frontend
 
 React
@@ -84,16 +100,21 @@ MUI
 
 shadcn/ui
 
+Keycloak JS
+
 PROJECT STRUCTURE
 
 Root
 docker-compose.yml
+root-level Keycloak realm import artifact (default example filename: `toir-realm.json`)
 server/
 client/
 
 Backend
 server/
 src/
+auth/
+config/
 modules/{entity}/
 prisma/schema.prisma
 prisma/seed.ts
@@ -101,9 +122,15 @@ prisma/seed.ts
 .env.example
 
 Frontend
-client/src/resources/{entity}/
-client/src/App.tsx
-client/src/dataProvider.ts
+client/
+src/
+auth/
+config/
+resources/{entity}/
+App.tsx
+main.tsx
+dataProvider.ts
+.env.example
 
 STEP 1 — Parse DSL
 
@@ -134,6 +161,7 @@ Backend
 @prisma/client
 prisma
 @nestjs/config
+jose
 
 Frontend
 
@@ -142,6 +170,7 @@ ra-data-simple-rest
 @mui/material
 @emotion/react
 @emotion/styled
+keycloak-js
 
 STEP 4 — Generate Prisma schema
 
@@ -165,7 +194,7 @@ DTO mapping
 decimal → string
 date → ISO string
 
-STEP 5 — Generate NestJS modules
+STEP 5 — Generate NestJS CRUD modules
 
 Per entity generate:
 
@@ -190,7 +219,31 @@ Examples
 /equipment-types/:code
 /repair-orders/:id
 
-STEP 6 — Generate Service Layer
+STEP 6 — Generate backend auth infrastructure
+
+Generate:
+
+AuthModule
+JWT guard
+roles guard
+@Public()
+@Roles()
+typed authenticated principal
+typed env validation
+
+Rules:
+
+- `/health` must remain public
+- CRUD routes must be protected by default
+- RBAC source must be `realm_access.roles`
+- JWT verification must use issuer + audience + JWKS
+- JWKS resolution priority must be:
+  1. explicit `KEYCLOAK_JWKS_URL`
+  2. OIDC discovery
+  3. `${issuer}/protocol/openid-connect/certs`
+- Do not use deprecated Keycloak-specific Node adapters
+
+STEP 7 — Generate Service Layer
 
 Service layer must follow backend/service-rules.md.
 
@@ -229,7 +282,7 @@ data
 
 Example (PK = id)
 
-const { id: \_pk, ...data } = dto
+const { id: _pk, ...data } = dto
 
 return prisma.entity.update({
 where: { id },
@@ -244,36 +297,58 @@ id
 primary key attribute
 readonly attributes
 
-STEP 7 — Generate PrismaService
+STEP 8 — Generate frontend auth integration
 
-Requirements
+Generate:
 
-extends PrismaClient
-implements OnModuleInit
-await this.$connect()
+client/src/config/env.ts
+client/src/auth/keycloak.ts
+client/src/auth/authProvider.ts
 
-Do NOT use
+Rules:
 
-beforeExit
+- Keycloak login must be redirect-based only
+- Use Authorization Code + PKCE (`S256`)
+- Initialize Keycloak before rendering the SPA
+- Attach `Authorization: Bearer <access_token>` through the shared request seam in `client/src/dataProvider.ts`
+- `401` must force re-authentication
+- `403` must surface access denied without forcing re-authentication
+- Token refresh must be concurrency-safe
+- Do not store tokens in `localStorage` or `sessionStorage`
+- Frontend auth config must fail fast if required auth vars are missing
 
-STEP 8 — Generate runtime infrastructure
+STEP 9 — Generate runtime infrastructure
 
-Create
+Create:
 
 server/.env
 server/.env.example
+client/.env.example
+root-level Keycloak realm import artifact (default example filename: `toir-realm.json`)
 
-DATABASE_URL example
+Backend env examples must include:
 
-postgresql://postgres:postgres@localhost:5432/toir
+PORT
+DATABASE_URL
+CORS_ALLOWED_ORIGINS
+KEYCLOAK_ISSUER_URL
+KEYCLOAK_AUDIENCE
+KEYCLOAK_JWKS_URL (optional)
 
-Add to package.json
+Frontend env examples must include:
+
+VITE_API_URL
+VITE_KEYCLOAK_URL
+VITE_KEYCLOAK_REALM
+VITE_KEYCLOAK_CLIENT_ID
+
+Add to package.json:
 
 postinstall: prisma generate
 
-STEP 9 — Database runtime
+STEP 10 — Database runtime
 
-Generate root
+Generate root:
 
 docker-compose.yml
 
@@ -282,25 +357,25 @@ PostgreSQL container
 postgres:16
 port 5432
 
-STEP 10 — Generate seed
+STEP 11 — Generate seed
 
-Create
+Create:
 
 server/prisma/seed.ts
 
-Seed minimal data for
+Seed minimal data for:
 
 EquipmentType
 Equipment
 RepairOrder
 
-Add to package.json
+Add to package.json:
 
 prisma.seed
 
-STEP 11 — Generate React Admin
+STEP 12 — Generate React Admin resources
 
-For each entity generate
+For each entity generate:
 
 Field mapping
 
@@ -310,7 +385,7 @@ date → DateInput
 enum → SelectInput
 FK → ReferenceInput
 
-API responses MUST contain
+API responses MUST contain:
 
 If PK ≠ id, map primary key to id.
 
@@ -321,9 +396,9 @@ id: record.code,
 code: record.code
 }
 
-STEP 12 — Validation
+STEP 13 — Validation
 
-Verify
+Verify:
 
 docker-compose.yml exists
 database container starts
@@ -332,26 +407,36 @@ prisma db seed works
 API responds /health
 React Admin receives id
 update services sanitize payload before Prisma
+frontend auth files exist
+backend auth files exist
+auth env examples exist
+public /health is preserved
+unauthenticated protected route returns 401
+insufficient role returns 403
+generated realm import artifact is self-contained and guarantees `sub`, `aud`, and `realm_access.roles`
 
 OUTPUT
 
-Provide
+Provide:
 
 FULLSTACK GENERATION REPORT
 
-Include
+Include:
 
 1 Parsed DSL
 2 Prisma models
 3 Backend modules
 4 API endpoints
 5 React Admin resources
-6 Runtime configuration
-7 Validation results
+6 Authentication and authorization
+7 Runtime configuration
+8 Validation results
 
 RUN INSTRUCTIONS
 
-The generated application must run successfully with
+The generated application must run successfully with:
+
+Import the generated root-level Keycloak realm artifact (for example `toir-realm.json`) into the external Keycloak server
 
 docker compose up -d
 
