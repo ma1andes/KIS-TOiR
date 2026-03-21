@@ -40,6 +40,20 @@ The generator must not treat `401` and `403` as the same outcome.
 
 ---
 
+# Identity Resolution
+
+The generated `authProvider.getIdentity()` must use token claims already present in the parsed token.
+
+Rules:
+
+1. Prefer `sub`, `preferred_username`, `email`, and `name`.
+2. Do not call `keycloak.loadUserProfile()` by default.
+3. Do not rely on the Keycloak `/account` endpoint for baseline CRUD/admin generation.
+
+The default generator strategy is to avoid the `/account` request entirely rather than solving it through broader Keycloak CORS settings.
+
+---
+
 # Token Handling
 
 The generated frontend must use Keycloak JS token handling with these rules:
@@ -117,6 +131,7 @@ React Admin requires every record in list and detail responses to contain a fiel
 1. Every record returned by the API must contain an **`id`** field.
 2. If the DSL primary key is not named `id`, the generator must **map** the primary key value to an `id` field in the API response (backend) or in a frontend adapter.
 3. The `id` field must contain the **value of the primary key** (e.g. uuid string, or `code` value for EquipmentType).
+4. If the primary key is not literally `id`, backend list/query logic must map React Admin `_sort=id` to the real primary key field before constructing ORM sorting.
 
 **Example:**
 
@@ -143,5 +158,7 @@ API response must include `id` so React Admin can identify the record:
 ```
 
 If the response only had `{ "code": "pump", "name": "Pump" }`, React Admin would not work correctly because it expects `id`. The backend or frontend adapter must therefore set `id: record.code` (or equivalent) when the primary key is not `id`.
+
+If React Admin later sends `_sort=id`, the generated backend must map that synthetic `id` sort back to the real primary key field (for example `code`) before building the Prisma `orderBy` clause.
 
 This rule ensures compatibility with React Admin resource identity handling.

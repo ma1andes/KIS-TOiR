@@ -80,13 +80,35 @@ npm install keycloak-js
 
 Generation pipeline order:
 
-1. **Parse DSL** — Read domain, DTO, API, and UI DSL files.
+1. **Parse DSL** — Read `domain/*.dsl` as the single required input. If present, optional override files under `overrides/` may be applied after domain parsing, but DTO/API/UI DSL files must not be required.
 2. **Run CLI scaffolding** — Create `server` with NestJS CLI and `client` with Vite CLI; install runtime and auth dependencies listed above.
 3. **Code generation** — Generate Prisma schema, NestJS modules/DTOs/PrismaService/auth infrastructure, and React Admin resources/auth integration.
-4. **Runtime infrastructure** — Generate backend/frontend `.env.example`, runtime config files, lifecycle scripts, and a root-level Keycloak realm import artifact (repository default example filename: `toir-realm.json`).
+4. **Runtime infrastructure** — Generate backend/frontend `.env.example`, root/package `.gitignore` files, runtime config files, lifecycle scripts, and a root-level Keycloak realm import artifact (repository default example filename: `toir-realm.json`).
 5. **Database runtime** — Generate `docker-compose.yml` in project root with PostgreSQL service (`postgres`, image `postgres:16`, port `5432:5432`).
 6. **Migration** — Apply schema with `npx prisma migrate dev`.
 7. **Seed** — Populate minimal development data with `npx prisma db seed`.
 8. **Validation** — Run checks from `generation/post-generation-validation.md`, including auth validation and realm-template validation.
 
-Scaffolding (steps 1–2) must be done with the CLI. Steps 3–8 must be generated from the DSL and the project context documents, including the auth-specific context in `auth/*.md`.
+Scaffolding (steps 1–2) must be done with the CLI. Steps 3–8 must be generated from `domain/*.dsl`, optional non-duplicating overrides in `overrides/`, and the project context documents, including the auth-specific context in `auth/*.md`.
+There is no separate DTO/API/UI DSL preparation step in the scaffolding workflow.
+
+## Git ignore rules
+
+The generated project must include:
+
+- root `.gitignore`
+- `server/.gitignore`
+- `client/.gitignore`
+
+These files must keep local-only artifacts out of git, including at minimum:
+
+- `node_modules/`
+- `dist/`
+- `dist-ssr/`
+- `coverage/`
+- `*.tsbuildinfo`
+- `.env`
+- `.env.local`
+- `.env.*.local`
+
+The generator must not ignore committed source, documentation, or `.env.example` files.

@@ -9,7 +9,7 @@ Backend stack:
 - PostgreSQL
 - jose
 
-The backend is generated from the DSL specification.
+The backend is generated from `domain/*.dsl`.
 
 Each DSL entity becomes:
 
@@ -18,6 +18,15 @@ Each DSL entity becomes:
 - CRUD controller
 - Service
 - DTO definitions
+
+---
+
+# Single Source of Truth
+
+- `domain/*.dsl` is the only required input for backend generation.
+- DTOs and REST API contracts must be derived from the domain model, primary keys, foreign keys, and enums defined in the domain DSL.
+- Backend documentation, generation rules, and optional overrides must not duplicate entity, attribute, or relation structures outside the domain DSL.
+- Deprecated multi-DSL inputs are compatibility-only artifacts and must never be treated as authoritative backend inputs or used to redefine entities, attributes, primary keys, foreign keys, relations, or enums.
 
 ---
 
@@ -180,6 +189,12 @@ Response format must follow React Admin requirements:
 "total": number
 }
 
+Sorting rules:
+
+1. Generated list/query logic must use actual model field names in ORM `orderBy` clauses.
+2. If an entity primary key is not literally `id` but the API exposes synthetic `id` for React Admin compatibility, incoming `_sort=id` must be mapped to the real primary key field before building the query.
+3. This mapping rule applies generally to all natural-key entities, not as a one-off entity hack.
+
 ---
 
 # Service Layer
@@ -197,6 +212,8 @@ remove(id)
 ---
 
 # DTO Rules
+
+DTOs are generated automatically from the domain DSL and are never a separate required DSL input.
 
 Create DTO:
 

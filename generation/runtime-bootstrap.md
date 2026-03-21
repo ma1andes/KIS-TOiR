@@ -9,6 +9,8 @@ The generator must produce a **runnable development environment** consisting of:
 - frontend SPA
 - PostgreSQL database
 
+Runtime bootstrap assumes the application was generated from `domain/*.dsl` plus optional non-duplicating overrides only. There is no separate DTO/API/UI DSL bootstrap step.
+
 The generator must also produce the runtime artifacts required to bootstrap auth from zero, including a root-level Keycloak realm import artifact. The repository default example filename is `toir-realm.json`, but future generations must allow a project-specific equivalent.
 
 ---

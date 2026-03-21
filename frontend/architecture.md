@@ -9,11 +9,20 @@ Frontend stack:
 - shadcn/ui
 - Keycloak JS
 
-The frontend is generated from the DSL and API specification.
+The frontend is generated from `domain/*.dsl`.
 
 Each entity becomes a React Admin resource.
 
 The generated frontend must also include Keycloak authentication by default.
+
+---
+
+# Single Source of Truth
+
+- `domain/*.dsl` is the only required input for frontend generation.
+- React Admin resources, fields, references, and routes must be derived from the domain model, primary keys, foreign keys, and enums defined in the domain DSL.
+- Frontend documentation, generation rules, and optional overrides must not duplicate entity, attribute, or relation structures outside the domain DSL.
+- Deprecated multi-DSL inputs are compatibility-only artifacts and must never be treated as authoritative frontend inputs or used to redefine entities, attributes, primary keys, foreign keys, relations, or enums.
 
 ---
 
@@ -55,6 +64,7 @@ The generated `App.tsx` must register:
 - `authProvider`
 
 The generated `Admin` root must enforce authenticated operation. The generated frontend must not operate anonymously once auth is enabled.
+The generated `authProvider.getIdentity()` must resolve identity from token claims already present in the parsed token and must not trigger a baseline Keycloak `/account` request.
 
 Example:
 
@@ -108,6 +118,7 @@ Rules:
 2. Use Authorization Code + PKCE (`S256`).
 3. Do not generate a custom in-app username/password login form.
 4. Do not render the authenticated admin app before Keycloak initialization completes.
+5. Do not introduce `keycloak.loadUserProfile()` or `/account` profile-fetch requests as part of baseline app startup or identity resolution.
 
 ---
 

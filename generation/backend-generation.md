@@ -35,14 +35,46 @@ Follow:
 
 ---
 
-# Step 1 — Parse DSL
+# Input Contract
 
-Read DSL inputs and extract:
+Required input:
+
+- `domain/*.dsl`
+
+Optional extension input:
+
+- `overrides/api-overrides.dsl`
+
+Optional extension layout:
+
+```text
+overrides/
+  api-overrides.dsl
+```
+
+Rules:
+
+- Parse `domain/*.dsl` as the only authoritative DSL input.
+- Generate DTOs and REST API contracts automatically from the parsed domain model.
+- The generator must work when `overrides/api-overrides.dsl` is absent.
+- Optional overrides may refine derived API behavior but must not redefine entities, attributes, primary keys, foreign keys, relations, or enums.
+- Supplemental DTO/API DSL inputs must not participate in backend parsing, dependency resolution, or backend generation decisions.
+- Do not read standalone DTO or API DSL files.
+
+---
+
+# Step 1 — Parse Domain DSL
+
+Read `domain/*.dsl` and extract:
 
 - entities
 - attributes, including the actual primary key attribute per entity
 - enums
 - foreign keys
+
+All entities, attributes, primary keys, foreign keys, relations, and enums used by the backend pipeline must come from the parsed domain DSL.
+
+If `overrides/api-overrides.dsl` exists, process it only after the domain model has been parsed and only as optional non-authoritative metadata.
 
 The generator must treat auth as default runtime infrastructure, not as a DSL feature toggle.
 
@@ -89,6 +121,12 @@ Generate backend source artifacts:
    - sanitize update payload before Prisma
    - remove `id`, the entity primary key, and readonly attributes from `data`
    - do not pass the raw request body directly to `prisma.*.update()`
+6. **List/query sorting methods**:
+   - use only actual model field names in ORM `orderBy`
+   - if the API exposes synthetic `id` for React Admin but the real primary key is different, map incoming `_sort=id` to the real primary key field before building `orderBy`
+   - apply this rule to every entity with a non-`id` primary key
+
+All backend DTOs and REST endpoints are derived artifacts. The generator must not require or parse separate DTO/API DSL documents.
 
 Use mapping rules from `backend/prisma-rules.md`:
 
@@ -223,3 +261,4 @@ Run runtime, auth, and contract checks from `generation/post-generation-validati
 - protected routes reject unauthenticated requests with `401`
 - authenticated users with insufficient role receive `403`
 - React Admin-compatible API responses include `id` for every record
+- natural-key entities translate React Admin `_sort=id` to the real primary key field

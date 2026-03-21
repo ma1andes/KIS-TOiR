@@ -12,13 +12,45 @@ Follow:
 
 ---
 
-# Step 1 — Parse DSL
+# Input Contract
+
+Required input:
+
+- `domain/*.dsl`
+
+Optional extension input:
+
+- `overrides/ui-overrides.dsl`
+
+Optional extension layout:
+
+```text
+overrides/
+  ui-overrides.dsl
+```
+
+Rules:
+
+- Parse `domain/*.dsl` as the only authoritative DSL input.
+- Generate React Admin resources, views, and field mappings automatically from the parsed domain model.
+- The generator must work when `overrides/ui-overrides.dsl` is absent.
+- Optional overrides may refine derived UI behavior but must not redefine entities, attributes, primary keys, foreign keys, relations, or enums.
+- Supplemental UI DSL inputs must not participate in frontend parsing, dependency resolution, or frontend generation decisions.
+- Do not read a standalone UI DSL file.
+
+---
+
+# Step 1 — Parse Domain DSL
 
 Extract:
 
 - entities
 - attributes
 - relation fields required for reference inputs and reference displays
+
+All frontend resources, fields, references, routes, and type-driven widget choices must be derived from the parsed domain DSL before optional overrides are considered.
+
+If `overrides/ui-overrides.dsl` exists, process it only after the domain model has been parsed and only as optional non-authoritative metadata.
 
 The generator must treat auth as default frontend infrastructure rather than as an optional feature.
 
@@ -54,13 +86,21 @@ For each entity create:
 - `EntityEdit.tsx`
 - `EntityShow.tsx`
 
-Resource generation must remain compatible with the auth-aware shared request seam.
+Resource generation must remain compatible with the auth-aware shared request seam and must be derived from domain metadata rather than a separate UI DSL.
 
 ---
 
 # Step 4 — Map fields
 
 Map DSL attributes to React Admin components according to existing field rules and relation semantics.
+
+Minimum type mapping:
+
+- `string`, `text` -> `TextInput`, `TextField`
+- `integer`, `decimal` -> `NumberInput`, `NumberField`
+- `date` -> `DateInput`, `DateField`
+- `enum` -> `SelectInput`
+- foreign key -> `ReferenceInput`, `ReferenceField`
 
 Reference/resource lookups must continue to flow through the same shared authenticated request layer used by the main CRUD resources.
 
@@ -98,6 +138,11 @@ Generate Keycloak frontend integration with these required rules:
 - Authorization Code + PKCE with `S256`
 - initialize Keycloak before React render
 - provide a React Admin `authProvider`
+- derive `authProvider.getIdentity()` from token claims already present in the parsed token
+- prefer `sub`, `preferred_username`, `email`, and `name` for identity resolution
+- do not call `keycloak.loadUserProfile()` by default
+- do not rely on the Keycloak `/account` endpoint for baseline CRUD/admin generation
+- avoid the `/account` request entirely by default rather than broadening Keycloak CORS behavior
 - distinguish auth failures from authorization failures:
   - `401` -> force logout / re-authentication
   - `403` -> do not re-authenticate; surface access denied / permission error

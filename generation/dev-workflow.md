@@ -2,6 +2,8 @@
 
 This document describes the **developer workflow** for running a generated fullstack application locally. The generator must produce a project that supports this workflow so the app is **fully runnable** after generation, including authentication.
 
+This workflow assumes the project was generated from `domain/*.dsl` plus optional non-duplicating overrides only. Developers must not need to prepare separate DTO/API/UI DSL inputs before running the app.
+
 ---
 
 # Prerequisites

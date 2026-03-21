@@ -49,6 +49,29 @@ The generated frontend must not rely on anonymous access with later lazy auth at
 
 ---
 
+# Identity Resolution
+
+The generated `authProvider.getIdentity()` must derive identity from token claims already present in the parsed access token / parsed token.
+
+Preferred claims:
+
+- `sub`
+- `preferred_username`
+- `email`
+- `name`
+
+Rules:
+
+1. `getIdentity()` must be token-claim based by default.
+2. The generated frontend must **not** call `keycloak.loadUserProfile()` during normal app startup or baseline identity resolution.
+3. The generated frontend must **not** depend on the Keycloak `/account` endpoint for baseline CRUD/admin generation.
+4. The default generator strategy is to avoid the `/account` request entirely, not to broaden Keycloak CORS behavior.
+5. Any network-based account-profile integration requires an explicit future prompt.
+
+The generator must not introduce startup/profile-fetch requests that are unnecessary for authorization.
+
+---
+
 # Shared Request Seam
 
 The generated frontend must use the shared request seam in `client/src/dataProvider.ts` as the single place where access tokens are attached.
@@ -131,4 +154,3 @@ VITE_KEYCLOAK_URL=https://sso.greact.ru
 VITE_KEYCLOAK_REALM=toir
 VITE_KEYCLOAK_CLIENT_ID=toir-frontend
 ```
-

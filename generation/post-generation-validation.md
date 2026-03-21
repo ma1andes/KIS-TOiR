@@ -6,6 +6,17 @@ After generating the backend or fullstack application, run these checks to ensur
 
 # Validation Checklist
 
+## Source-of-truth input contract
+
+- [ ] Fullstack generation succeeds when `domain/*.dsl` is the only required DSL input.
+- [ ] The generator can produce backend and frontend outputs from `domain/*.dsl` alone before optional overrides are considered.
+- [ ] DTO, API, and UI artifacts are derived automatically from the domain model, keys, relations, and enums.
+- [ ] Optional override files are not required for a successful generation run.
+- [ ] Optional overrides, if present, refine only derived API/UI output and do not duplicate the domain model.
+- [ ] No generator step depends on duplicated domain structures outside `domain/*.dsl`.
+
+**Failure symptoms:** generation requires extra DSL inputs, generated layers drift from the domain model, or the pipeline fails when override files are absent.
+
 ## 1. Frontend and backend env files
 
 - [ ] `server/.env.example` exists and documents:
@@ -27,7 +38,22 @@ After generating the backend or fullstack application, run these checks to ensur
 
 ---
 
-## 2. Keycloak realm artifact
+## 2. Git ignore hygiene
+
+- [ ] Root `.gitignore` exists.
+- [ ] `server/.gitignore` exists.
+- [ ] `client/.gitignore` exists.
+- [ ] Generated gitignore rules exclude local dependency directories such as `node_modules/`.
+- [ ] Generated gitignore rules exclude build artifacts such as `dist/` and `dist-ssr/`.
+- [ ] Generated gitignore rules exclude local env files such as `.env`, `.env.local`, and `.env.*.local`.
+- [ ] Generated gitignore rules exclude `coverage/` and `*.tsbuildinfo`.
+- [ ] Generated gitignore rules do **not** exclude committed project artifacts such as source files, docs, and `.env.example`.
+
+**Failure symptoms:** `npm install`, local builds, or local env setup explode git status with thousands of files that should remain untracked.
+
+---
+
+## 3. Keycloak realm artifact
 
 - [ ] A root-level generated Keycloak realm import artifact exists.
 - [ ] If the repository default filename `toir-realm.json` is not used, the project-specific equivalent is documented consistently across bootstrap and workflow docs.
@@ -50,7 +76,7 @@ After generating the backend or fullstack application, run these checks to ensur
 
 ---
 
-## 3. Frontend auth files and behavior
+## 4. Frontend auth files and behavior
 
 - [ ] Generated frontend includes:
   - `client/src/config/env.ts`
@@ -65,6 +91,9 @@ After generating the backend or fullstack application, run these checks to ensur
 - [ ] No custom in-app username/password login form is generated.
 - [ ] `Authorization Code + PKCE (S256)` is encoded in the frontend auth flow.
 - [ ] `client/src/dataProvider.ts` or the documented shared request seam injects `Authorization: Bearer <access_token>` into all API requests.
+- [ ] `authProvider.getIdentity()` derives identity from parsed token claims such as `sub`, `preferred_username`, `email`, and `name`.
+- [ ] Generated frontend auth code does not call `keycloak.loadUserProfile()`.
+- [ ] Generated frontend auth code does not rely on the Keycloak `/account` endpoint for baseline CRUD/admin generation.
 - [ ] Token refresh is concurrency-safe:
   - one shared in-flight refresh operation
   - no parallel refresh stampede
@@ -77,7 +106,7 @@ After generating the backend or fullstack application, run these checks to ensur
 
 ---
 
-## 4. Backend auth files and behavior
+## 5. Backend auth files and behavior
 
 - [ ] Generated backend includes:
   - `server/src/auth/auth.module.ts`
@@ -100,7 +129,7 @@ After generating the backend or fullstack application, run these checks to ensur
 
 ---
 
-## 5. CRUD protection and RBAC defaults
+## 6. CRUD protection and RBAC defaults
 
 - [ ] `/health` is public.
 - [ ] Each generated CRUD controller method other than explicit public routes is protected by the generated auth/RBAC infrastructure.
@@ -115,7 +144,7 @@ After generating the backend or fullstack application, run these checks to ensur
 
 ---
 
-## 6. PrismaService implementation
+## 7. PrismaService implementation
 
 - [ ] A `PrismaService` (or equivalent) class exists and extends `PrismaClient`.
 - [ ] It implements `OnModuleInit` and calls `await this.$connect()` in `onModuleInit()`.
@@ -127,7 +156,7 @@ After generating the backend or fullstack application, run these checks to ensur
 
 ---
 
-## 7. Prisma client lifecycle
+## 8. Prisma client lifecycle
 
 - [ ] `package.json` includes a script that runs Prisma client generation:
   - either `"postinstall": "prisma generate"` (or `npx prisma generate`)
@@ -138,7 +167,7 @@ After generating the backend or fullstack application, run these checks to ensur
 
 ---
 
-## 8. Database migration
+## 9. Database migration
 
 - [ ] Migration workflow is documented.
 - [ ] Instruction to run `npx prisma migrate dev` exists after first generation or schema change.
@@ -148,7 +177,7 @@ After generating the backend or fullstack application, run these checks to ensur
 
 ---
 
-## 9. REST route parameters
+## 10. REST route parameters
 
 - [ ] For each entity, path parameters use the correct primary key name from the DSL.
 - [ ] Entity with PK `id` uses `/:id`.
@@ -160,18 +189,20 @@ After generating the backend or fullstack application, run these checks to ensur
 
 ---
 
-## 10. DTO type mapping and React Admin ID compatibility
+## 11. DTO type mapping and React Admin ID compatibility
 
 - [ ] DSL `decimal` maps to DTO/API `string`.
 - [ ] DSL `date` maps to DTO/API `string` (ISO) or equivalent string serialization.
 - [ ] Every API response object contains a field named `id`.
 - [ ] If the entity primary key is not named `id`, the response maps the primary key to `id`.
+- [ ] For entities with non-`id` primary keys, backend list/query logic translates React Admin `_sort=id` to the real primary key field.
+- [ ] Generated ORM `orderBy` clauses never reference synthetic `id` when the underlying model field does not exist.
 
 **Failure symptoms:** serialization issues for decimals/dates, or React Admin cannot identify records.
 
 ---
 
-## 11. Update payload sanitization
+## 12. Update payload sanitization
 
 - [ ] Update endpoints do not pass `id` or the primary key in Prisma `data`.
 - [ ] Generated update methods remove `id`, the entity primary key, and readonly attributes before calling `prisma.*.update()`.
@@ -180,7 +211,7 @@ After generating the backend or fullstack application, run these checks to ensur
 
 ---
 
-## 12. Database runtime
+## 13. Database runtime
 
 - [ ] `docker-compose.yml` exists at the project root.
 - [ ] It defines a PostgreSQL service with image `postgres:16`, port `5432`, and credentials matching `DATABASE_URL`.
@@ -191,7 +222,7 @@ After generating the backend or fullstack application, run these checks to ensur
 
 ---
 
-## 13. Migrations, seed, and health endpoint
+## 14. Migrations, seed, and health endpoint
 
 - [ ] `npx prisma migrate dev` runs successfully from `server/`.
 - [ ] Seed script exists at `server/prisma/seed.ts` (or equivalent).
@@ -209,9 +240,11 @@ After generating the backend or fullstack application, run these checks to ensur
 | --- | --- |
 | Frontend env | `client/.env.example` with required Vite auth vars |
 | Backend env | `server/.env.example` with DB, CORS, and Keycloak vars |
+| Git ignore | Root/server/client `.gitignore` exclude local-only artifacts |
 | Fail-fast config | Startup fails when required auth env is missing |
 | Realm artifact | Root generated realm import artifact with self-contained auth setup |
 | Frontend auth | `keycloak.ts`, `authProvider.ts`, authenticated `dataProvider.ts` |
+| Frontend identity | Token-claim based `getIdentity()`; no `loadUserProfile()` / `/account` dependency |
 | Backend auth | `AuthModule`, guards, decorators, typed principal |
 | JWKS strategy | explicit URL -> discovery -> certs fallback |
 | Role source | `realm_access.roles` only |
@@ -224,6 +257,7 @@ After generating the backend or fullstack application, run these checks to ensur
 | Prisma lifecycle | `OnModuleInit` + `$connect()`, no `beforeExit` |
 | Update sanitization | Strip `id` / PK / readonly before Prisma update |
 | React Admin `id` | Every record includes `id` |
+| Natural-key sorting | Map React Admin `_sort=id` to the real primary key field |
 | Database runtime | PostgreSQL compose exists and starts |
 
 ---
@@ -231,6 +265,7 @@ After generating the backend or fullstack application, run these checks to ensur
 # Integration with generation pipeline
 
 1. Backend and frontend generation must produce artifacts that satisfy the above by default.
-2. Runtime bootstrap must include Keycloak realm import/verification before app startup.
-3. After generation, run this checklist manually or via an automated script.
-4. If any check fails, update the generator context so future runs pass without manual repair.
+2. The generator must successfully build the fullstack app from `domain/*.dsl` alone; optional overrides may refine output but cannot be required.
+3. Runtime bootstrap must include Keycloak realm import/verification before app startup.
+4. After generation, run this checklist manually or via an automated script.
+5. If any check fails, update the generator context so future runs pass without manual repair.

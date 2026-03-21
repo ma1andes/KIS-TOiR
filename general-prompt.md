@@ -28,7 +28,12 @@ You must read the project documentation in the following strict order:
 
 domain/dsl-spec.md
 
-examples/*.dsl
+domain/*.dsl
+
+If present, read optional overrides after the domain DSL:
+
+overrides/api-overrides.dsl
+overrides/ui-overrides.dsl
 
 backend/architecture.md
 
@@ -68,9 +73,29 @@ generation/post-generation-validation.md
 
 Do not ignore any rules defined in these documents.
 
+INPUT CONTRACT
+
+Required DSL input:
+
+domain/*.dsl
+
+Optional override inputs:
+
+overrides/api-overrides.dsl
+overrides/ui-overrides.dsl
+
+Rules:
+
+- Domain DSL is the single source of truth for entities, attributes, primary keys, foreign keys, and enums.
+- DTO, API, and UI must be derived from the domain DSL.
+- Optional overrides must not duplicate or redefine the domain model.
+- Generation must work without override files.
+- Ignore deprecated multi-DSL inputs if they are present in the repository; they are not authoritative generation inputs.
+- Do not require standalone DTO, API, or UI DSL inputs.
+
 GOAL
 
-Generate a DSL-driven fullstack CRUD system with default Keycloak authentication and authorization.
+Generate a domain-DSL-driven fullstack CRUD system with default Keycloak authentication and authorization.
 
 Repository-specific defaults and examples may use names such as `toir`, `toir-frontend`, `toir-backend`, `toir-realm.json`, and `*.greact.ru`, but the generator must parameterize realm name, client IDs, production URLs, and realm-artifact filename for other generated projects.
 
@@ -105,6 +130,7 @@ Keycloak JS
 PROJECT STRUCTURE
 
 Root
+.gitignore
 docker-compose.yml
 root-level Keycloak realm import artifact (default example filename: `toir-realm.json`)
 server/
@@ -118,11 +144,13 @@ config/
 modules/{entity}/
 prisma/schema.prisma
 prisma/seed.ts
+.gitignore
 .env
 .env.example
 
 Frontend
 client/
+.gitignore
 src/
 auth/
 config/
@@ -132,15 +160,18 @@ main.tsx
 dataProvider.ts
 .env.example
 
-STEP 1 — Parse DSL
+STEP 1 — Parse Domain DSL
 
-Parse all DSL files and extract:
+Parse domain/*.dsl and extract:
 
 Entities
 Attributes
 Primary keys
 Foreign keys
 Enums
+
+If present, read optional override files only after the domain model has been parsed. Overrides may refine derived API or UI behavior but must never redefine entities, attributes, primary keys, foreign keys, or enums.
+Do not consult any supplemental DTO/API/UI DSL source when deriving backend or frontend artifacts.
 
 Respect the DSL specification.
 
@@ -194,7 +225,7 @@ DTO mapping
 decimal → string
 date → ISO string
 
-STEP 5 — Generate NestJS CRUD modules
+STEP 5 — Generate NestJS CRUD modules and derived DTOs
 
 Per entity generate:
 
@@ -311,6 +342,10 @@ Rules:
 - Use Authorization Code + PKCE (`S256`)
 - Initialize Keycloak before rendering the SPA
 - Attach `Authorization: Bearer <access_token>` through the shared request seam in `client/src/dataProvider.ts`
+- `authProvider.getIdentity()` must derive identity from parsed token claims such as `sub`, `preferred_username`, `email`, and `name`
+- Do not call `keycloak.loadUserProfile()` by default
+- Do not rely on the Keycloak `/account` endpoint for baseline CRUD/admin generation
+- Avoid the `/account` request entirely by default rather than broadening Keycloak CORS behavior
 - `401` must force re-authentication
 - `403` must surface access denied without forcing re-authentication
 - Token refresh must be concurrency-safe
@@ -324,6 +359,9 @@ Create:
 server/.env
 server/.env.example
 client/.env.example
+root/.gitignore
+server/.gitignore
+client/.gitignore
 root-level Keycloak realm import artifact (default example filename: `toir-realm.json`)
 
 Backend env examples must include:
@@ -345,6 +383,17 @@ VITE_KEYCLOAK_CLIENT_ID
 Add to package.json:
 
 postinstall: prisma generate
+
+Generated `.gitignore` files must prevent local-only artifacts from entering git, including:
+
+node_modules
+dist
+dist-ssr
+coverage
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local
 
 STEP 10 — Database runtime
 
@@ -375,6 +424,8 @@ prisma.seed
 
 STEP 12 — Generate React Admin resources
 
+Generate React Admin resources automatically from the domain DSL.
+
 For each entity generate:
 
 Field mapping
@@ -388,6 +439,8 @@ FK → ReferenceInput
 API responses MUST contain:
 
 If PK ≠ id, map primary key to id.
+
+If PK ≠ id, backend list/query logic must map React Admin `_sort=id` to the real primary key field before constructing ORM sorting.
 
 Example
 
@@ -410,9 +463,14 @@ update services sanitize payload before Prisma
 frontend auth files exist
 backend auth files exist
 auth env examples exist
+root/server/client .gitignore files exist
+gitignore rules exclude local dependency, build, env, coverage, and tsbuildinfo artifacts
+frontend auth code does not call `keycloak.loadUserProfile()`
+frontend `getIdentity()` is token-claim based and does not rely on `/account`
 public /health is preserved
 unauthenticated protected route returns 401
 insufficient role returns 403
+natural-key entities map React Admin `_sort=id` to the real primary key field
 generated realm import artifact is self-contained and guarantees `sub`, `aud`, and `realm_access.roles`
 
 OUTPUT
