@@ -2,6 +2,8 @@
 
 This document describes the single DSL (Domain Specific Language) used to specify fullstack CRUD applications. The only required DSL input is `domain/*.dsl`.
 
+`domain-summary.json` is a derived artifact generated from this DSL to stabilize LLM-first generation and feed the lightweight validation gate. It must never replace the DSL as the source of truth. The active prompt corpus that consumes this contract lives in `prompts/`.
+
 ---
 
 # DSL Responsibility

@@ -3,10 +3,6 @@
   Сущности: Equipment (Оборудование), EquipmentType (Вид оборудования), RepairOrder (Заявка на ремонт)
 */
 
-// ─────────────────────────────────────────────
-//  Перечисления
-// ─────────────────────────────────────────────
-
 enum EquipmentStatus {
   value Active {
     label "В эксплуатации";
@@ -61,11 +57,6 @@ enum RepairOrderStatus {
   }
 }
 
-
-// ─────────────────────────────────────────────
-//  Справочник: Вид оборудования
-// ─────────────────────────────────────────────
-
 entity EquipmentType {
   description "Вид (марка) оборудования — нормативный справочник НСИ";
 
@@ -88,7 +79,6 @@ entity EquipmentType {
     type string;
   }
 
-  // Нормативный межремонтный ресурс (моточасы)
   attribute maintenanceIntervalHours {
     description "Периодичность ТО, моточасов";
     type integer;
@@ -99,11 +89,6 @@ entity EquipmentType {
     type integer;
   }
 }
-
-
-// ─────────────────────────────────────────────
-//  Основная сущность: Оборудование
-// ─────────────────────────────────────────────
 
 entity Equipment {
   description "Единица оборудования — объект ремонта и технического обслуживания";
@@ -131,14 +116,13 @@ entity Equipment {
     is required;
   }
 
-  // Связь с видом оборудования (справочник НСИ)
-    attribute equipmentTypeCode {
-        type string;
-        key foreign {
-            relates EquipmentType.code;
-        }
-    is required;
+  attribute equipmentTypeCode {
+    type string;
+    key foreign {
+      relates EquipmentType.code;
     }
+    is required;
+  }
 
   attribute status {
     description "Текущий статус";
@@ -157,7 +141,6 @@ entity Equipment {
     type date;
   }
 
-  // Наработка фиксируется вручную или из производственной программы
   attribute totalEngineHours {
     description "Общая наработка, моточасов";
     type decimal;
@@ -178,11 +161,6 @@ entity Equipment {
     type text;
   }
 }
-
-
-// ─────────────────────────────────────────────
-//  Заявка на ремонт
-// ─────────────────────────────────────────────
 
 entity RepairOrder {
   description "Заявка на ремонт — формируется по ППР или по факту обнаруженного дефекта";
