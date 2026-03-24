@@ -13,27 +13,60 @@ import {
   ReferenceField,
   SelectArrayInput,
   ReferenceInput,
-  AutocompleteInput
-} from 'react-admin';
+  AutocompleteInput,
+} from "react-admin";
 
 const statusChoices = [
-  { id: 'Active', name: 'Active' },
-  { id: 'Repair', name: 'Repair' },
-  { id: 'Reserve', name: 'Reserve' },
-  { id: 'WriteOff', name: 'WriteOff' },
+  { id: "Active", name: "В эксплуатации" },
+  { id: "Repair", name: "В ремонте" },
+  { id: "Reserve", name: "В резерве" },
+  { id: "WriteOff", name: "Списано" },
 ];
 
 const equipmentFilters = [
   <TextInput key="q" source="q" label="Поиск" alwaysOn />,
-  <TextInput key="inventoryNumber" source="inventoryNumber" label="inventoryNumber" />,
-  <TextInput key="serialNumber" source="serialNumber" label="serialNumber" />,
-  <TextInput key="name" source="name" label="name" />,
-  <ReferenceInput key="equipmentTypeCode" source="equipmentTypeCode" reference="equipment-types" label="equipmentTypeCode">
-    <AutocompleteInput optionText={(record) => record.code ? `${record.code} — ${record.name ?? record.code}` : (record.name ?? record.id)} filterToQuery={(searchText) => ({ q: searchText })} />
+  <TextInput
+    key="inventoryNumber"
+    source="inventoryNumber"
+    label="Инвентарный номер"
+  />,
+  <TextInput
+    key="serialNumber"
+    source="serialNumber"
+    label="Заводской (серийный) номер"
+  />,
+  <TextInput
+    key="name"
+    source="name"
+    label="Наименование единицы оборудования"
+  />,
+  <ReferenceInput
+    key="equipmentTypeCode"
+    source="equipmentTypeCode"
+    reference="equipment-types"
+    label="Вид оборудования"
+  >
+    <AutocompleteInput
+      optionText={(record) =>
+        record.code
+          ? `${record.code} — ${record.name ?? record.code}`
+          : (record.name ?? record.id)
+      }
+      filterToQuery={(searchText) => ({ q: searchText })}
+    />
   </ReferenceInput>,
-  <SelectArrayInput key="status" source="status" label="status" choices={statusChoices} />,
-  <TextInput key="location" source="location" label="location" />,
-  <TextInput key="notes" source="notes" label="notes" />
+  <SelectArrayInput
+    key="status"
+    source="status"
+    label="Текущий статус"
+    choices={statusChoices}
+  />,
+  <TextInput
+    key="location"
+    source="location"
+    label="Место эксплуатации / скважина / куст"
+  />,
+  <TextInput key="notes" source="notes" label="Примечания" />,
 ];
 
 const EquipmentListActions = () => (
@@ -45,22 +78,44 @@ const EquipmentListActions = () => (
 );
 
 export const EquipmentList = () => (
-  <List actions={<EquipmentListActions />} filters={equipmentFilters} sort={{ field: 'id', order: 'ASC' }}>
+  <List
+    actions={<EquipmentListActions />}
+    filters={equipmentFilters}
+    sort={{ field: "inventoryNumber", order: "ASC" }}
+  >
     <Datagrid rowClick="show">
       <TextField source="id" label="id" />
-      <TextField source="inventoryNumber" label="inventoryNumber" />
-      <TextField source="serialNumber" label="serialNumber" />
-      <TextField source="name" label="name" />
-      <ReferenceField source="equipmentTypeCode" reference="equipment-types" label="equipmentTypeCode" link="show">
-        <TextField source="name" />
+      <TextField source="inventoryNumber" label="Инвентарный номер" />
+      <TextField source="serialNumber" label="Заводской (серийный) номер" />
+      <TextField source="name" label="Наименование единицы оборудования" />
+      <ReferenceField
+        source="equipmentTypeCode"
+        reference="equipment-types"
+        label="Вид оборудования"
+        link="show"
+      >
+        <TextField source="code" />
       </ReferenceField>
-      <SelectField source="status" label="status" choices={statusChoices} />
-      <TextField source="location" label="location" />
-      <DateField source="commissionedAt" label="commissionedAt" />
-      <NumberField source="totalEngineHours" label="totalEngineHours" />
-      <NumberField source="engineHoursSinceLastRepair" label="engineHoursSinceLastRepair" />
-      <DateField source="lastRepairAt" label="lastRepairAt" />
-      <TextField source="notes" label="notes" />
+      <SelectField
+        source="status"
+        label="Текущий статус"
+        choices={statusChoices}
+      />
+      <TextField
+        source="location"
+        label="Место эксплуатации / скважина / куст"
+      />
+      <DateField source="commissionedAt" label="Дата ввода в эксплуатацию" />
+      <NumberField
+        source="totalEngineHours"
+        label="Общая наработка, моточасов"
+      />
+      <NumberField
+        source="engineHoursSinceLastRepair"
+        label="Наработка с последнего ремонта, моточасов"
+      />
+      <DateField source="lastRepairAt" label="Дата последнего ремонта" />
+      <TextField source="notes" label="Примечания" />
     </Datagrid>
   </List>
 );

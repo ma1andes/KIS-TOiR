@@ -4,6 +4,14 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateEquipmentTypeDto } from './dto/create-equipment-type.dto';
 import { UpdateEquipmentTypeDto } from './dto/update-equipment-type.dto';
 
+function serializeRecord(record: any) {
+  return {
+    ...record,
+
+
+  };
+}
+
 @Injectable()
 export class EquipmentTypeService {
   constructor(private readonly prisma: PrismaService) {}
@@ -31,6 +39,8 @@ export class EquipmentTypeService {
     if (query.name) where.name = { contains: query.name, mode: 'insensitive' };
     if (query.manufacturer) where.manufacturer = { contains: query.manufacturer, mode: 'insensitive' };
 
+    
+
     // Enum multi-value support (e.g. status=A&status=B)
     
 
@@ -44,30 +54,37 @@ export class EquipmentTypeService {
       this.prisma.equipmentType.count({ where }),
     ]);
 
-    const mapped = data.map((r: any) => ({ id: r.code, ...r }));
+    const mapped = data.map((r: any) => ({ id: r.code, ...serializeRecord(r) }));
     return { data: mapped, total };
   }
 
   async findOne(id: string) {
     const record = await this.prisma.equipmentType.findUniqueOrThrow({ where: { code: id } as any });
-    return { id: (record as any).code, ...record };
+    return { id: (record as any).code, ...serializeRecord(record) };
   }
 
   async create(dto: CreateEquipmentTypeDto) {
-    const record = await this.prisma.equipmentType.create({ data: dto as any });
-    return { id: (record as any).code, ...record };
+    const data: any = { ...(dto as any) };
+
+
+
+    const record = await this.prisma.equipmentType.create({ data });
+    return { id: (record as any).code, ...serializeRecord(record) };
   }
 
   async update(id: string, dto: UpdateEquipmentTypeDto) {
     const data: any = { ...(dto as any) };
     delete data.id;
     delete data.code;
+
+
+
     const record = await this.prisma.equipmentType.update({ where: { code: id } as any, data });
-    return { id: (record as any).code, ...record };
+    return { id: (record as any).code, ...serializeRecord(record) };
   }
 
   async remove(id: string) {
     const record = await this.prisma.equipmentType.delete({ where: { code: id } as any });
-    return { id: (record as any).code, ...record };
+    return { id: (record as any).code, ...serializeRecord(record) };
   }
 }

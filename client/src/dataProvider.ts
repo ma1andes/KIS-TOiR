@@ -1,6 +1,6 @@
 import { DataProvider, fetchUtils } from 'react-admin';
 
-const apiUrl = 'http://localhost:3001';
+const apiUrl = 'http://localhost:3000';
 const httpClient = fetchUtils.fetchJson;
 
 function buildQueryString(query: Record<string, unknown>) {

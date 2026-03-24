@@ -13,8 +13,8 @@ import {
 
 const equipmentTypeFilters = [
   <TextInput key="q" source="q" label="Поиск" alwaysOn />,
-  <TextInput key="name" source="name" label="name" />,
-  <TextInput key="manufacturer" source="manufacturer" label="manufacturer" />
+  <TextInput key="name" source="name" label="Наименование вида" />,
+  <TextInput key="manufacturer" source="manufacturer" label="Производитель" />
 ];
 
 const EquipmentTypeListActions = () => (
@@ -28,11 +28,11 @@ const EquipmentTypeListActions = () => (
 export const EquipmentTypeList = () => (
   <List actions={<EquipmentTypeListActions />} filters={equipmentTypeFilters} sort={{ field: 'code', order: 'ASC' }}>
     <Datagrid rowClick="show">
-      <TextField source="code" label="code" />
-      <TextField source="name" label="name" />
-      <TextField source="manufacturer" label="manufacturer" />
-      <NumberField source="maintenanceIntervalHours" label="maintenanceIntervalHours" />
-      <NumberField source="overhaulIntervalHours" label="overhaulIntervalHours" />
+      <TextField source="code" label="Код вида оборудования" />
+      <TextField source="name" label="Наименование вида" />
+      <TextField source="manufacturer" label="Производитель" />
+      <NumberField source="maintenanceIntervalHours" label="Периодичность ТО, моточасов" />
+      <NumberField source="overhaulIntervalHours" label="Периодичность КР, моточасов" />
     </Datagrid>
   </List>
 );

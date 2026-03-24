@@ -1,14 +1,14 @@
-import { Create, SimpleForm, TextInput } from 'react-admin';
+import { Create, SimpleForm, TextInput, NumberInput } from 'react-admin';
 
 
 export const EquipmentTypeCreate = () => (
   <Create>
     <SimpleForm>
-      <TextInput source="code" label="code" isRequired />
-      <TextInput source="name" label="name" isRequired />
-      <TextInput source="manufacturer" label="manufacturer"  />
-      <TextInput source="maintenanceIntervalHours" label="maintenanceIntervalHours" />
-      <TextInput source="overhaulIntervalHours" label="overhaulIntervalHours" />
+      <TextInput source="code" label="Код вида оборудования" isRequired />
+      <TextInput source="name" label="Наименование вида" isRequired />
+      <TextInput source="manufacturer" label="Производитель"  />
+      <NumberInput source="maintenanceIntervalHours" label="Периодичность ТО, моточасов" />
+      <NumberInput source="overhaulIntervalHours" label="Периодичность КР, моточасов" />
     </SimpleForm>
   </Create>
 );

@@ -4,6 +4,16 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { CreateEquipmentDto } from './dto/create-equipment.dto';
 import { UpdateEquipmentDto } from './dto/update-equipment.dto';
 
+function serializeRecord(record: any) {
+  return {
+    ...record,
+    totalEngineHours: record.totalEngineHours?.toString() ?? null,
+    engineHoursSinceLastRepair: record.engineHoursSinceLastRepair?.toString() ?? null,
+    commissionedAt: record.commissionedAt?.toISOString() ?? null,
+    lastRepairAt: record.lastRepairAt?.toISOString() ?? null,
+  };
+}
+
 @Injectable()
 export class EquipmentService {
   constructor(private readonly prisma: PrismaService) {}
@@ -13,7 +23,7 @@ export class EquipmentService {
     const end = parseInt(query._end) || 10;
     const take = end - start;
     const skip = start;
-    const sortField = query._sort || 'id';
+    const sortField = query._sort || 'inventoryNumber';
     const sortOrder = (query._order || 'ASC').toLowerCase() as 'asc' | 'desc';
 
     const where: any = {};
@@ -33,9 +43,10 @@ export class EquipmentService {
     if (query.inventoryNumber) where.inventoryNumber = { contains: query.inventoryNumber, mode: 'insensitive' };
     if (query.serialNumber) where.serialNumber = { contains: query.serialNumber, mode: 'insensitive' };
     if (query.name) where.name = { contains: query.name, mode: 'insensitive' };
-    if (query.equipmentTypeCode) where.equipmentTypeCode = { contains: query.equipmentTypeCode, mode: 'insensitive' };
     if (query.location) where.location = { contains: query.location, mode: 'insensitive' };
     if (query.notes) where.notes = { contains: query.notes, mode: 'insensitive' };
+
+    if (query.equipmentTypeCode) where.equipmentTypeCode = query.equipmentTypeCode;
 
     // Enum multi-value support (e.g. status=A&status=B)
     if (query.status) { const vals = Array.isArray(query.status) ? query.status : [query.status]; where.status = vals.length > 1 ? { in: vals } : vals[0]; }
@@ -50,30 +61,41 @@ export class EquipmentService {
       this.prisma.equipment.count({ where }),
     ]);
 
-    const mapped = data;
+    const mapped = data.map(serializeRecord);
     return { data: mapped, total };
   }
 
   async findOne(id: string) {
     const record = await this.prisma.equipment.findUniqueOrThrow({ where: { id: id } as any });
-    return record;
+    return serializeRecord(record);
   }
 
   async create(dto: CreateEquipmentDto) {
-    const record = await this.prisma.equipment.create({ data: dto as any });
-    return record;
+    const data: any = { ...(dto as any) };
+    if (data.commissionedAt) data.commissionedAt = new Date(data.commissionedAt);
+    if (data.lastRepairAt) data.lastRepairAt = new Date(data.lastRepairAt);
+    if (data.totalEngineHours) data.totalEngineHours = new Prisma.Decimal(data.totalEngineHours);
+    if (data.engineHoursSinceLastRepair) data.engineHoursSinceLastRepair = new Prisma.Decimal(data.engineHoursSinceLastRepair);
+
+    const record = await this.prisma.equipment.create({ data });
+    return serializeRecord(record);
   }
 
   async update(id: string, dto: UpdateEquipmentDto) {
     const data: any = { ...(dto as any) };
     delete data.id;
     delete data.id;
+    if (data.commissionedAt) data.commissionedAt = new Date(data.commissionedAt);
+    if (data.lastRepairAt) data.lastRepairAt = new Date(data.lastRepairAt);
+    if (data.totalEngineHours !== undefined && data.totalEngineHours !== null) data.totalEngineHours = new Prisma.Decimal(data.totalEngineHours);
+    if (data.engineHoursSinceLastRepair !== undefined && data.engineHoursSinceLastRepair !== null) data.engineHoursSinceLastRepair = new Prisma.Decimal(data.engineHoursSinceLastRepair);
+
     const record = await this.prisma.equipment.update({ where: { id: id } as any, data });
-    return record;
+    return serializeRecord(record);
   }
 
   async remove(id: string) {
     const record = await this.prisma.equipment.delete({ where: { id: id } as any });
-    return record;
+    return serializeRecord(record);
   }
 }

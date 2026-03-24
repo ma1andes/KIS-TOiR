@@ -74,14 +74,20 @@ function parseBlocks(text, kind) {
 
 function parseEnum(body) {
   const values = [];
-  const re = /^\s*value\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{/gm;
+  const labels = {};
+  const re = /value\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{([\s\S]*?)\}/gm;
   let m;
-  while ((m = re.exec(body))) values.push(m[1]);
-  return { values };
+  while ((m = re.exec(body))) {
+    values.push(m[1]);
+    const label = (m[2].match(/label\s+"([^"]+)"/m) || [])[1];
+    labels[m[1]] = label || m[1];
+  }
+  return { values, labels };
 }
 
 function parseEntity(body) {
   const attrs = [];
+  const entityLabel = (body.match(/description\s+"([^"]+)"/m) || [])[1];
   const lines = body.split(/\r?\n/);
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(/^\s*attribute\s+([A-Za-z_][A-Za-z0-9_]*)\s*\{\s*$/);
@@ -106,10 +112,12 @@ function parseEntity(body) {
     const isPrimary = /^\s*key primary\s*;/m.test(abody);
     const defaultValue = (abody.match(/^\s*default\s+([A-Za-z_][A-Za-z0-9_]*)\s*;/m) || [])[1];
     const foreignRel = (abody.match(/relates\s+([A-Za-z_][A-Za-z0-9_]*)\.([A-Za-z_][A-Za-z0-9_]*)\s*;/m) || []).slice(1);
+    const description = (abody.match(/description\s+"([^"]+)"/m) || [])[1];
 
     attrs.push({
       name,
       type,
+      label: description || name,
       isRequired,
       isUnique,
       isPrimary,
@@ -122,7 +130,7 @@ function parseEntity(body) {
   const pk = attrs.find((a) => a.isPrimary);
   if (!pk) throw new Error('Entity missing primary key attribute');
 
-  return { attributes: attrs, primaryKey: pk.name };
+  return { attributes: attrs, primaryKey: pk.name, label: entityLabel };
 }
 
 function parseDomainDSL(dslText) {
@@ -136,6 +144,45 @@ function parseDomainDSL(dslText) {
     entities[b.name] = parseEntity(b.body);
   }
   return { enums, entities };
+}
+
+function getEntityAttrNames(entity) {
+  return new Set(entity.attributes.map((a) => a.name));
+}
+
+function getBestSortField(entity, pk) {
+  const attrs = getEntityAttrNames(entity);
+  if (attrs.has('inventoryNumber')) return 'inventoryNumber';
+  if (attrs.has('number')) return 'number';
+  if (attrs.has('code')) return 'code';
+  if (attrs.has('name')) return 'name';
+  return pk;
+}
+
+function getReferenceDisplayExpr(foreignEntity) {
+  const attrs = getEntityAttrNames(foreignEntity);
+  if (attrs.has('inventoryNumber')) {
+    return "(record) => record.inventoryNumber ? `${record.inventoryNumber} — ${record.name ?? record.inventoryNumber}` : (record.name ?? record.id)";
+  }
+  if (attrs.has('code')) {
+    return "(record) => record.code ? `${record.code} — ${record.name ?? record.code}` : (record.name ?? record.id)";
+  }
+  if (attrs.has('number')) {
+    return "(record) => record.number ? `${record.number} — ${record.name ?? record.number}` : (record.name ?? record.id)";
+  }
+  if (attrs.has('name')) {
+    return "(record) => record.name ?? record.id";
+  }
+  return "(record) => record.id";
+}
+
+function getAttributeLabel(attr, allEntities) {
+  if (attr.label && attr.label !== attr.name) return attr.label;
+  if (attr.name === 'status') return 'Статус';
+  if (attr.name === 'equipmentId') return 'Оборудование';
+  if (attr.name === 'equipmentTypeCode') return 'Вид оборудования';
+  if (attr.foreign) return allEntities[attr.foreign.entity]?.label || attr.name;
+  return attr.name;
 }
 
 function prismaScalarType(dslType) {
@@ -281,23 +328,44 @@ function renderBackendModule(entityName, entity, resourceName, pk) {
   if (pk !== 'id') updateDtoLines.push(`  id?: string;`);
   for (const a of entity.attributes) {
     if (pk !== 'id' && a.name === 'id') continue;
-    updateDtoLines.push(`  ${a.name}?: ${dtoType(a)} | null;`);
+    updateDtoLines.push(`  ${a.name}?: ${dtoType(a)};`);
   }
   updateDtoLines.push('}');
 
   const controller = `import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Res } from '@nestjs/common';\nimport { Response } from 'express';\nimport { ${serviceName} } from './${folder}.service';\nimport { Create${className}Dto } from './dto/create-${folder}.dto';\nimport { Update${className}Dto } from './dto/update-${folder}.dto';\n\n@Controller('${resourceName}')\nexport class ${controllerName} {\n  constructor(private readonly service: ${serviceName}) {}\n\n  @Get()\n  async findAll(@Query() query: any, @Res() res: Response) {\n    const result = await this.service.findAll(query);\n    res.set('Content-Range', \`${resourceName} \${query._start || 0}-\${query._end || result.total}/\${result.total}\`);\n    res.set('Access-Control-Expose-Headers', 'Content-Range');\n    return res.json(result.data);\n  }\n\n  @Get(':${pk}')\n  findOne(@Param('${pk}') id: string) {\n    return this.service.findOne(id);\n  }\n\n  @Post()\n  create(@Body() dto: Create${className}Dto) {\n    return this.service.create(dto);\n  }\n\n  @Patch(':${pk}')\n  update(@Param('${pk}') id: string, @Body() dto: Update${className}Dto) {\n    return this.service.update(id, dto);\n  }\n\n  @Delete(':${pk}')\n  remove(@Param('${pk}') id: string) {\n    return this.service.remove(id);\n  }\n}\n`;
 
-  const service = `import { Injectable } from '@nestjs/common';\nimport { Prisma } from '@prisma/client';\nimport { PrismaService } from '../../prisma/prisma.service';\nimport { Create${className}Dto } from './dto/create-${folder}.dto';\nimport { Update${className}Dto } from './dto/update-${folder}.dto';\n\n@Injectable()\nexport class ${serviceName} {\n  constructor(private readonly prisma: PrismaService) {}\n\n  async findAll(query: { _start?: string; _end?: string; _sort?: string; _order?: string; [key: string]: any }) {\n    const start = parseInt(query._start) || 0;\n    const end = parseInt(query._end) || 10;\n    const take = end - start;\n    const skip = start;\n    const sortField = query._sort || '${pk}';\n    const sortOrder = (query._order || 'ASC').toLowerCase() as 'asc' | 'desc';\n\n    const where: any = {};\n\n    if (query.q) {\n      const q = String(query.q);\n      const ors: any[] = [];\n      ${entity.attributes
+  const service = `import { Injectable } from '@nestjs/common';\nimport { Prisma } from '@prisma/client';\nimport { PrismaService } from '../../prisma/prisma.service';\nimport { Create${className}Dto } from './dto/create-${folder}.dto';\nimport { Update${className}Dto } from './dto/update-${folder}.dto';\n\nfunction serializeRecord(record: any) {\n  return {\n    ...record,\n${entity.attributes
+      .filter((a) => a.type === 'decimal')
+      .map((a) => `    ${a.name}: record.${a.name}?.toString() ?? null,`)
+      .join('\n')}\n${entity.attributes
+      .filter((a) => a.type === 'date')
+      .map((a) => `    ${a.name}: record.${a.name}?.toISOString() ?? null,`)
+      .join('\n')}\n  };\n}\n\n@Injectable()\nexport class ${serviceName} {\n  constructor(private readonly prisma: PrismaService) {}\n\n  async findAll(query: { _start?: string; _end?: string; _sort?: string; _order?: string; [key: string]: any }) {\n    const start = parseInt(query._start) || 0;\n    const end = parseInt(query._end) || 10;\n    const take = end - start;\n    const skip = start;\n    const sortField = query._sort || '${getBestSortField(entity, pk)}';\n    const sortOrder = (query._order || 'ASC').toLowerCase() as 'asc' | 'desc';\n\n    const where: any = {};\n\n    if (query.q) {\n      const q = String(query.q);\n      const ors: any[] = [];\n      ${entity.attributes
         .filter((a) => ['string', 'text'].includes(a.type))
         .slice(0, 6)
         .map((a) => `ors.push({ ${a.name}: { contains: q, mode: 'insensitive' } });`)
         .join('\n      ')}\n      if (ors.length) where.OR = ors;\n    }\n\n    ${entity.attributes
-      .filter((a) => ['string', 'text'].includes(a.type))
+      .filter((a) => ['string', 'text'].includes(a.type) && !a.foreign)
       .map((a) => `if (query.${a.name}) where.${a.name} = { contains: query.${a.name}, mode: 'insensitive' };`)
+      .join('\n    ')}\n\n    ${entity.attributes
+      .filter((a) => a.foreign)
+      .map((a) => `if (query.${a.name}) where.${a.name} = query.${a.name};`)
       .join('\n    ')}\n\n    // Enum multi-value support (e.g. status=A&status=B)\n    ${entity.attributes
       .filter((a) => !['string', 'text', 'uuid', 'integer', 'decimal', 'date'].includes(a.type))
       .map((a) => `if (query.${a.name}) { const vals = Array.isArray(query.${a.name}) ? query.${a.name} : [query.${a.name}]; where.${a.name} = vals.length > 1 ? { in: vals } : vals[0]; }`)
-      .join('\n    ')}\n\n    if (query.id) {\n      const ids = Array.isArray(query.id) ? query.id : [query.id];\n      where.${pk} = { in: ids };\n    }\n\n    const [data, total] = await Promise.all([\n      this.prisma.${lowerFirst(className)}.findMany({ where, skip, take, orderBy: { [sortField]: sortOrder } }),\n      this.prisma.${lowerFirst(className)}.count({ where }),\n    ]);\n\n    const mapped = ${pk === 'id' ? 'data' : `data.map((r: any) => ({ id: r.${pk}, ...r }))`};\n    return { data: mapped, total };\n  }\n\n  async findOne(id: string) {\n    const record = await this.prisma.${lowerFirst(className)}.findUniqueOrThrow({ where: { ${pk}: id } as any });\n    return ${pk === 'id' ? 'record' : `{ id: (record as any).${pk}, ...record }`};\n  }\n\n  async create(dto: Create${className}Dto) {\n    const record = await this.prisma.${lowerFirst(className)}.create({ data: dto as any });\n    return ${pk === 'id' ? 'record' : `{ id: (record as any).${pk}, ...record }`};\n  }\n\n  async update(id: string, dto: Update${className}Dto) {\n    const data: any = { ...(dto as any) };\n    delete data.id;\n    delete data.${pk};\n    const record = await this.prisma.${lowerFirst(className)}.update({ where: { ${pk}: id } as any, data });\n    return ${pk === 'id' ? 'record' : `{ id: (record as any).${pk}, ...record }`};\n  }\n\n  async remove(id: string) {\n    const record = await this.prisma.${lowerFirst(className)}.delete({ where: { ${pk}: id } as any });\n    return ${pk === 'id' ? 'record' : `{ id: (record as any).${pk}, ...record }`};\n  }\n}\n`;
+      .join('\n    ')}\n\n    if (query.id) {\n      const ids = Array.isArray(query.id) ? query.id : [query.id];\n      where.${pk} = { in: ids };\n    }\n\n    const [data, total] = await Promise.all([\n      this.prisma.${lowerFirst(className)}.findMany({ where, skip, take, orderBy: { [sortField]: sortOrder } }),\n      this.prisma.${lowerFirst(className)}.count({ where }),\n    ]);\n\n    const mapped = ${pk === 'id' ? 'data.map(serializeRecord)' : `data.map((r: any) => ({ id: r.${pk}, ...serializeRecord(r) }))`};\n    return { data: mapped, total };\n  }\n\n  async findOne(id: string) {\n    const record = await this.prisma.${lowerFirst(className)}.findUniqueOrThrow({ where: { ${pk}: id } as any });\n    return ${pk === 'id' ? 'serializeRecord(record)' : `{ id: (record as any).${pk}, ...serializeRecord(record) }`};\n  }\n\n  async create(dto: Create${className}Dto) {\n    const data: any = { ...(dto as any) };\n${entity.attributes
+      .filter((a) => a.type === 'date')
+      .map((a) => `    if (data.${a.name}) data.${a.name} = new Date(data.${a.name});`)
+      .join('\n')}\n${entity.attributes
+      .filter((a) => a.type === 'decimal')
+      .map((a) => `    if (data.${a.name}) data.${a.name} = new Prisma.Decimal(data.${a.name});`)
+      .join('\n')}\n\n    const record = await this.prisma.${lowerFirst(className)}.create({ data });\n    return ${pk === 'id' ? 'serializeRecord(record)' : `{ id: (record as any).${pk}, ...serializeRecord(record) }`};\n  }\n\n  async update(id: string, dto: Update${className}Dto) {\n    const data: any = { ...(dto as any) };\n    delete data.id;\n    delete data.${pk};\n${entity.attributes
+      .filter((a) => a.type === 'date')
+      .map((a) => `    if (data.${a.name}) data.${a.name} = new Date(data.${a.name});`)
+      .join('\n')}\n${entity.attributes
+      .filter((a) => a.type === 'decimal')
+      .map((a) => `    if (data.${a.name} !== undefined && data.${a.name} !== null) data.${a.name} = new Prisma.Decimal(data.${a.name});`)
+      .join('\n')}\n\n    const record = await this.prisma.${lowerFirst(className)}.update({ where: { ${pk}: id } as any, data });\n    return ${pk === 'id' ? 'serializeRecord(record)' : `{ id: (record as any).${pk}, ...serializeRecord(record) }`};\n  }\n\n  async remove(id: string) {\n    const record = await this.prisma.${lowerFirst(className)}.delete({ where: { ${pk}: id } as any });\n    return ${pk === 'id' ? 'serializeRecord(record)' : `{ id: (record as any).${pk}, ...serializeRecord(record) }`};\n  }\n}\n`;
 
   const mod = `import { Module } from '@nestjs/common';\nimport { ${controllerName} } from './${folder}.controller';\nimport { ${serviceName} } from './${folder}.service';\n\n@Module({\n  controllers: [${controllerName}],\n  providers: [${serviceName}],\n})\nexport class ${moduleName} {}\n`;
 
@@ -315,7 +383,7 @@ function renderBackendModule(entityName, entity, resourceName, pk) {
   };
 }
 
-function renderFrontendResource(entityName, entity, resourceName, pk, enums) {
+function renderFrontendResource(entityName, entity, resourceName, pk, enums, allEntities) {
   const folder = toKebab(entityName);
   const className = entityName;
   const enumAttrs = entity.attributes.filter(
@@ -325,6 +393,7 @@ function renderFrontendResource(entityName, entity, resourceName, pk, enums) {
 
   const identBase = toIdentifierFromKebab(folder);
   const filtersIdent = `${identBase}Filters`;
+  const sortField = getBestSortField(entity, pk);
 
   const hasNumber = entity.attributes.some((a) => ['integer', 'decimal'].includes(a.type));
   const hasDate = entity.attributes.some((a) => a.type === 'date');
@@ -357,14 +426,15 @@ function renderFrontendResource(entityName, entity, resourceName, pk, enums) {
   for (const a of enumAttrs) {
     const enumName = a.type;
     const values = enums?.[enumName]?.values ?? [];
+    const labels = enums?.[enumName]?.labels ?? {};
     const constName = `${a.name}Choices`;
     if (a.name === 'status') {
       choiceConsts.push(
-        `const statusChoices = [\n${values.map((v) => `  { id: '${v}', name: '${v}' },`).join('\n')}\n];\n`
+        `const statusChoices = [\n${values.map((v) => `  { id: '${v}', name: '${labels[v] ?? v}' },`).join('\n')}\n];\n`
       );
     } else {
       choiceConsts.push(
-        `const ${constName} = [\n${values.map((v) => `  { id: '${v}', name: '${v}' },`).join('\n')}\n];\n`
+        `const ${constName} = [\n${values.map((v) => `  { id: '${v}', name: '${labels[v] ?? v}' },`).join('\n')}\n];\n`
       );
     }
   }
@@ -375,66 +445,82 @@ function renderFrontendResource(entityName, entity, resourceName, pk, enums) {
     filterInputs.push(`<TextInput key="q" source="q" label="Поиск" alwaysOn />`);
   }
   for (const a of entity.attributes) {
+    const label = getAttributeLabel(a, allEntities);
     if (a.name === pk) continue;
     if (a.foreign) {
+      const referenceDisplay = getReferenceDisplayExpr(allEntities[a.foreign.entity]);
       filterInputs.push(
-        `<ReferenceInput key="${a.name}" source="${a.name}" reference="${pluralize(toKebab(a.foreign.entity))}" label="${a.name}">\n    <AutocompleteInput optionText={(record) => record.code ? \`\${record.code} — \${record.name ?? record.code}\` : (record.name ?? record.id)} filterToQuery={(searchText) => ({ q: searchText })} />\n  </ReferenceInput>`
+        `<ReferenceInput key="${a.name}" source="${a.name}" reference="${pluralize(toKebab(a.foreign.entity))}" label="${label}">\n    <AutocompleteInput optionText={${referenceDisplay}} filterToQuery={(searchText) => ({ q: searchText })} />\n  </ReferenceInput>`
       );
       continue;
     }
     if (['string', 'text', 'uuid'].includes(a.type)) {
-      filterInputs.push(`<TextInput key="${a.name}" source="${a.name}" label="${a.name}" />`);
+      filterInputs.push(`<TextInput key="${a.name}" source="${a.name}" label="${label}" />`);
       continue;
     }
     if (['integer', 'decimal'].includes(a.type)) continue;
     if (a.type === 'date') continue;
     // enum
     if (a.name === 'status') {
-      filterInputs.push(`<SelectArrayInput key="${a.name}" source="${a.name}" label="${a.name}" choices={statusChoices} />`);
+      filterInputs.push(`<SelectArrayInput key="${a.name}" source="${a.name}" label="${label}" choices={statusChoices} />`);
     } else {
-      filterInputs.push(`<SelectInput key="${a.name}" source="${a.name}" label="${a.name}" choices={${a.name}Choices} emptyText="Все" />`);
+      filterInputs.push(`<SelectInput key="${a.name}" source="${a.name}" label="${label}" choices={${a.name}Choices} emptyText="Все" />`);
     }
   }
 
   const listFields = [];
   for (const a of entity.attributes) {
+    const label = getAttributeLabel(a, allEntities);
     if (a.foreign) {
+      const referenceEntity = allEntities[a.foreign.entity];
+      const referenceAttrs = getEntityAttrNames(referenceEntity);
+      const fieldSource = referenceAttrs.has('inventoryNumber')
+        ? 'inventoryNumber'
+        : referenceAttrs.has('code')
+          ? 'code'
+          : referenceAttrs.has('number')
+            ? 'number'
+            : 'name';
       listFields.push(
-        `<ReferenceField source="${a.name}" reference="${pluralize(toKebab(a.foreign.entity))}" label="${a.name}" link="show">\n        <TextField source="name" />\n      </ReferenceField>`
+        `<ReferenceField source="${a.name}" reference="${pluralize(toKebab(a.foreign.entity))}" label="${label}" link="show">\n        <TextField source="${fieldSource}" />\n      </ReferenceField>`
       );
       continue;
     }
     if (a.type === 'date') {
-      listFields.push(`<DateField source="${a.name}" label="${a.name}" />`);
+      listFields.push(`<DateField source="${a.name}" label="${label}" />`);
     } else if (['integer', 'decimal'].includes(a.type)) {
-      listFields.push(`<NumberField source="${a.name}" label="${a.name}" />`);
+      listFields.push(`<NumberField source="${a.name}" label="${label}" />`);
     } else if (!['string', 'text', 'uuid', 'integer', 'decimal', 'date'].includes(a.type)) {
-      listFields.push(`<SelectField source="${a.name}" label="${a.name}" choices={${a.name === 'status' ? 'statusChoices' : `${a.name}Choices`}} />`);
+      listFields.push(`<SelectField source="${a.name}" label="${label}" choices={${a.name === 'status' ? 'statusChoices' : `${a.name}Choices`}} />`);
     } else {
-      listFields.push(`<TextField source="${a.name}" label="${a.name}" />`);
+      listFields.push(`<TextField source="${a.name}" label="${label}" />`);
     }
   }
 
-  const list = `import {\n  ${listImports.join(',\n  ')}\n} from 'react-admin';\n\n${choiceConsts.join('\n')}\nconst ${filtersIdent} = [\n  ${filterInputs.join(',\n  ')}\n];\n\nconst ${className}ListActions = () => (\n  <TopToolbar>\n    <FilterButton filters={${filtersIdent}} />\n    <CreateButton />\n    <ExportButton />\n  </TopToolbar>\n);\n\nexport const ${className}List = () => (\n  <List actions={<${className}ListActions />} filters={${filtersIdent}} sort={{ field: '${pk}', order: 'ASC' }}>\n    <Datagrid rowClick=\"show\">\n      ${listFields.join('\n      ')}\n    </Datagrid>\n  </List>\n);\n`;
+  const list = `import {\n  ${listImports.join(',\n  ')}\n} from 'react-admin';\n\n${choiceConsts.join('\n')}\nconst ${filtersIdent} = [\n  ${filterInputs.join(',\n  ')}\n];\n\nconst ${className}ListActions = () => (\n  <TopToolbar>\n    <FilterButton filters={${filtersIdent}} />\n    <CreateButton />\n    <ExportButton />\n  </TopToolbar>\n);\n\nexport const ${className}List = () => (\n  <List actions={<${className}ListActions />} filters={${filtersIdent}} sort={{ field: '${sortField}', order: 'ASC' }}>\n    <Datagrid rowClick=\"show\">\n      ${listFields.join('\n      ')}\n    </Datagrid>\n  </List>\n);\n`;
 
   const formField = (a, mode) => {
+    const label = getAttributeLabel(a, allEntities);
     if (a.isPrimary && mode === 'create' && a.type === 'uuid') return null;
     if (a.isPrimary && mode === 'edit') {
-      return `<TextInput source="${a.name}" label="${a.name}" disabled />`;
+      return `<TextInput source="${a.name}" label="${label}" disabled />`;
     }
     if (a.foreign) {
-      return `<ReferenceInput source="${a.name}" reference="${pluralize(toKebab(a.foreign.entity))}" label="${a.name}">\n        <AutocompleteInput optionText={(record) => record.code ? \`\${record.code} — \${record.name ?? record.code}\` : (record.name ?? record.id)} filterToQuery={(searchText) => ({ q: searchText })} />\n      </ReferenceInput>`;
+      const referenceDisplay = getReferenceDisplayExpr(allEntities[a.foreign.entity]);
+      return `<ReferenceInput source="${a.name}" reference="${pluralize(toKebab(a.foreign.entity))}">\n        <AutocompleteInput label="${label}" optionText={${referenceDisplay}} filterToQuery={(searchText) => ({ q: searchText })} />\n      </ReferenceInput>`;
     }
-    if (a.type === 'date') return `<TextInput source="${a.name}" label="${a.name}" />`;
-    if (['integer', 'decimal'].includes(a.type)) return `<TextInput source="${a.name}" label="${a.name}" />`;
+    if (a.type === 'date') return `<DateInput source="${a.name}" label="${label}" />`;
+    if (['integer', 'decimal'].includes(a.type)) return `<NumberInput source="${a.name}" label="${label}" />`;
     if (!['string', 'text', 'uuid', 'integer', 'decimal', 'date'].includes(a.type)) {
-      if (a.name === 'status' && statusEnumAttr) return `<SelectInput source="${a.name}" label="${a.name}" choices={statusChoices} emptyText="Не выбрано" />`;
-      return `<SelectInput source="${a.name}" label="${a.name}" choices={${a.name}Choices} emptyText="Не выбрано" />`;
+      if (a.name === 'status' && statusEnumAttr) return `<SelectInput source="${a.name}" label="${label}" choices={statusChoices} emptyText="Не выбрано" />`;
+      return `<SelectInput source="${a.name}" label="${label}" choices={${a.name}Choices} emptyText="Не выбрано" />`;
     }
-    return `<TextInput source="${a.name}" label="${a.name}" ${a.isRequired ? 'isRequired' : ''} />`;
+    return `<TextInput source="${a.name}" label="${label}" ${a.isRequired ? 'isRequired' : ''} />`;
   };
 
   const formImportSet = new Set(['SimpleForm', 'TextInput']);
+  if (hasNumber) formImportSet.add('NumberInput');
+  if (hasDate) formImportSet.add('DateInput');
   if (enumAttrs.length) formImportSet.add('SelectInput');
   if (hasFK) {
     formImportSet.add('ReferenceInput');
@@ -474,10 +560,15 @@ function ensureAppModule(apply, backendModules) {
     let out = src;
     for (const m of backendModules) {
       if (!out.includes(`import { ${m.moduleName} }`)) {
-        out = out.replace(
-          /import\s+\{\s*RepairOrderModule\s*\}[^;]*;\s*/m,
-          (x) => `${x}import { ${m.moduleName} } from '${m.importPath}';\n`
-        );
+        const importLine = `import { ${m.moduleName} } from '${m.importPath}';`;
+        const importMatches = [...out.matchAll(/^import\s+.*;$/gm)];
+        if (importMatches.length) {
+          const lastImport = importMatches[importMatches.length - 1];
+          const insertAt = lastImport.index + lastImport[0].length;
+          out = `${out.slice(0, insertAt)}\n${importLine}${out.slice(insertAt)}`;
+        } else {
+          out = `${importLine}\n${out}`;
+        }
       }
     }
     out = out.replace(/imports:\s*\[\s*([\s\S]*?)\s*\],/m, (match, inner) => {
@@ -504,7 +595,14 @@ function ensureClientApp(apply, frontendResources) {
       ];
       for (const imp of imports) {
         if (!out.includes(imp)) {
-          out = out.replace(/import\s+\{\s*RepairOrderShow\s*\}[^;]*;\s*/m, (x) => `${x}\n${imports.join('\n')}\n`);
+          const importMatches = [...out.matchAll(/^import\s+.*;$/gm)];
+          if (importMatches.length) {
+            const lastImport = importMatches[importMatches.length - 1];
+            const insertAt = lastImport.index + lastImport[0].length;
+            out = `${out.slice(0, insertAt)}\n${imports.join('\n')}${out.slice(insertAt)}`;
+          } else {
+            out = `${imports.join('\n')}\n${out}`;
+          }
           break;
         }
       }
@@ -540,7 +638,7 @@ function main() {
     const pk = ent.primaryKey;
     const resource = pluralize(toKebab(entityName));
     const be = renderBackendModule(entityName, ent, resource, pk);
-    const fe = renderFrontendResource(entityName, ent, resource, pk, parsed.enums);
+    const fe = renderFrontendResource(entityName, ent, resource, pk, parsed.enums, parsed.entities);
     backendModules.push(be);
     frontendResources.push(fe);
 
