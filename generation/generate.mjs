@@ -550,7 +550,42 @@ function renderFrontendResource(entityName, entity, resourceName, pk, enums, all
   const editImports = ['Edit', ...Array.from(formImportSet)].join(', ');
   const edit = `import { ${editImports} } from 'react-admin';\n\n${choiceConsts.join('\n')}\nexport const ${className}Edit = () => (\n  <Edit>\n    <SimpleForm>\n      ${entity.attributes.map((a) => formField(a, 'edit')).filter(Boolean).join('\n      ')}\n    </SimpleForm>\n  </Edit>\n);\n`;
 
-  const show = `import { Show, SimpleShowLayout, TextField } from 'react-admin';\n\nexport const ${className}Show = () => (\n  <Show>\n    <SimpleShowLayout>\n      ${entity.attributes.map((a) => `<TextField source="${a.name}" label="${a.name}" />`).join('\n      ')}\n    </SimpleShowLayout>\n  </Show>\n);\n`;
+  const showImportSet = new Set(['Show', 'SimpleShowLayout', 'TextField']);
+  if (hasNumber) showImportSet.add('NumberField');
+  if (hasDate) showImportSet.add('DateField');
+  if (enumAttrs.length) showImportSet.add('SelectField');
+  if (hasFK) showImportSet.add('ReferenceField');
+
+  const showFields = [];
+  for (const a of entity.attributes) {
+    const label = getAttributeLabel(a, allEntities);
+    if (a.foreign) {
+      const referenceEntity = allEntities[a.foreign.entity];
+      const referenceAttrs = getEntityAttrNames(referenceEntity);
+      const fieldSource = referenceAttrs.has('inventoryNumber')
+        ? 'inventoryNumber'
+        : referenceAttrs.has('code')
+          ? 'code'
+          : referenceAttrs.has('number')
+            ? 'number'
+            : 'name';
+      showFields.push(
+        `<ReferenceField source="${a.name}" reference="${pluralize(toKebab(a.foreign.entity))}" label="${label}" link="show">\n        <TextField source="${fieldSource}" />\n      </ReferenceField>`
+      );
+      continue;
+    }
+    if (a.type === 'date') {
+      showFields.push(`<DateField source="${a.name}" label="${label}" />`);
+    } else if (['integer', 'decimal'].includes(a.type)) {
+      showFields.push(`<NumberField source="${a.name}" label="${label}" />`);
+    } else if (!['string', 'text', 'uuid', 'integer', 'decimal', 'date'].includes(a.type)) {
+      showFields.push(`<SelectField source="${a.name}" label="${label}" choices={${a.name === 'status' ? 'statusChoices' : `${a.name}Choices`}} />`);
+    } else {
+      showFields.push(`<TextField source="${a.name}" label="${label}" />`);
+    }
+  }
+
+  const show = `import { ${Array.from(showImportSet).join(', ')} } from 'react-admin';\n\n${choiceConsts.join('\n')}export const ${className}Show = () => (\n  <Show>\n    <SimpleShowLayout>\n      ${showFields.join('\n      ')}\n    </SimpleShowLayout>\n  </Show>\n);\n`;
 
   return {
     files: {

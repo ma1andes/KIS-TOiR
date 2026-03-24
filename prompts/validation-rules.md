@@ -52,6 +52,8 @@ Validation is now a lightweight automated gate instead of a prose-only checklist
 - typed form mapping is preserved:
   - `integer` / `decimal` -> `NumberInput`
   - `date` -> `DateInput`
+- reference fields intended for navigation keep `ReferenceField link="show"`
+- resources keep `show={...}` registration in `App.tsx`
 
 ### Natural-key checks
 
