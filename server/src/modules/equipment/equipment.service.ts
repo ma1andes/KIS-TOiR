@@ -24,6 +24,7 @@ export class EquipmentService {
     const take = end - start;
     const skip = start;
     const sortField = query._sort || 'inventoryNumber';
+    const prismaSortField = sortField === 'id' ? 'id' : sortField;
     const sortOrder = (query._order || 'ASC').toLowerCase() as 'asc' | 'desc';
 
     const where: any = {};
@@ -57,7 +58,7 @@ export class EquipmentService {
     }
 
     const [data, total] = await Promise.all([
-      this.prisma.equipment.findMany({ where, skip, take, orderBy: { [sortField]: sortOrder } }),
+      this.prisma.equipment.findMany({ where, skip, take, orderBy: { [prismaSortField]: sortOrder } }),
       this.prisma.equipment.count({ where }),
     ]);
 

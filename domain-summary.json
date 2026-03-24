@@ -1,0 +1,324 @@
+{
+  "sourceFiles": [
+    "domain/TOiR.domain.dsl"
+  ],
+  "entities": [
+    {
+      "name": "EquipmentType",
+      "primaryKey": "code",
+      "fields": [
+        {
+          "name": "code",
+          "type": "string",
+          "required": true,
+          "unique": true,
+          "default": null
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "manufacturer",
+          "type": "string",
+          "required": false,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "maintenanceIntervalHours",
+          "type": "integer",
+          "required": false,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "overhaulIntervalHours",
+          "type": "integer",
+          "required": false,
+          "unique": false,
+          "default": null
+        }
+      ],
+      "foreignKeys": []
+    },
+    {
+      "name": "Equipment",
+      "primaryKey": "id",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "required": false,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "inventoryNumber",
+          "type": "string",
+          "required": true,
+          "unique": true,
+          "default": null
+        },
+        {
+          "name": "serialNumber",
+          "type": "string",
+          "required": false,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "name",
+          "type": "string",
+          "required": true,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "equipmentTypeCode",
+          "type": "string",
+          "required": true,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "status",
+          "type": "EquipmentStatus",
+          "required": true,
+          "unique": false,
+          "default": "Active"
+        },
+        {
+          "name": "location",
+          "type": "string",
+          "required": false,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "commissionedAt",
+          "type": "date",
+          "required": false,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "totalEngineHours",
+          "type": "decimal",
+          "required": false,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "engineHoursSinceLastRepair",
+          "type": "decimal",
+          "required": false,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "lastRepairAt",
+          "type": "date",
+          "required": false,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "unique": false,
+          "default": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "field": "equipmentTypeCode",
+          "references": {
+            "entity": "EquipmentType",
+            "field": "code"
+          }
+        }
+      ]
+    },
+    {
+      "name": "RepairOrder",
+      "primaryKey": "id",
+      "fields": [
+        {
+          "name": "id",
+          "type": "uuid",
+          "required": false,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "number",
+          "type": "string",
+          "required": true,
+          "unique": true,
+          "default": null
+        },
+        {
+          "name": "equipmentId",
+          "type": "uuid",
+          "required": true,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "repairKind",
+          "type": "RepairKind",
+          "required": true,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "status",
+          "type": "RepairOrderStatus",
+          "required": true,
+          "unique": false,
+          "default": "Draft"
+        },
+        {
+          "name": "plannedAt",
+          "type": "date",
+          "required": true,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "startedAt",
+          "type": "date",
+          "required": false,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "completedAt",
+          "type": "date",
+          "required": false,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "contractor",
+          "type": "string",
+          "required": false,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "engineHoursAtRepair",
+          "type": "decimal",
+          "required": false,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "unique": false,
+          "default": null
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "unique": false,
+          "default": null
+        }
+      ],
+      "foreignKeys": [
+        {
+          "field": "equipmentId",
+          "references": {
+            "entity": "Equipment",
+            "field": "id"
+          }
+        }
+      ]
+    }
+  ],
+  "enums": [
+    {
+      "name": "EquipmentStatus",
+      "values": [
+        {
+          "name": "Active",
+          "label": "В эксплуатации"
+        },
+        {
+          "name": "Repair",
+          "label": "В ремонте"
+        },
+        {
+          "name": "Reserve",
+          "label": "В резерве"
+        },
+        {
+          "name": "WriteOff",
+          "label": "Списано"
+        }
+      ]
+    },
+    {
+      "name": "RepairKind",
+      "values": [
+        {
+          "name": "TO",
+          "label": "Техническое обслуживание"
+        },
+        {
+          "name": "TR",
+          "label": "Текущий ремонт"
+        },
+        {
+          "name": "TRE",
+          "label": "Текущий расширенный ремонт"
+        },
+        {
+          "name": "KR",
+          "label": "Капитальный ремонт"
+        },
+        {
+          "name": "AR",
+          "label": "Аварийный ремонт"
+        },
+        {
+          "name": "MP",
+          "label": "Метрологическая поверка"
+        }
+      ]
+    },
+    {
+      "name": "RepairOrderStatus",
+      "values": [
+        {
+          "name": "Draft",
+          "label": "Черновик"
+        },
+        {
+          "name": "Approved",
+          "label": "Утверждена"
+        },
+        {
+          "name": "InWork",
+          "label": "В работе"
+        },
+        {
+          "name": "Done",
+          "label": "Выполнена"
+        },
+        {
+          "name": "Cancelled",
+          "label": "Отменена"
+        }
+      ]
+    }
+  ]
+}

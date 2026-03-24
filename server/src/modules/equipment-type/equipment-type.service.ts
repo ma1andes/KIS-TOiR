@@ -22,6 +22,7 @@ export class EquipmentTypeService {
     const take = end - start;
     const skip = start;
     const sortField = query._sort || 'code';
+    const prismaSortField = sortField === 'id' ? 'code' : sortField;
     const sortOrder = (query._order || 'ASC').toLowerCase() as 'asc' | 'desc';
 
     const where: any = {};
@@ -50,11 +51,11 @@ export class EquipmentTypeService {
     }
 
     const [data, total] = await Promise.all([
-      this.prisma.equipmentType.findMany({ where, skip, take, orderBy: { [sortField]: sortOrder } }),
+      this.prisma.equipmentType.findMany({ where, skip, take, orderBy: { [prismaSortField]: sortOrder } }),
       this.prisma.equipmentType.count({ where }),
     ]);
 
-    const mapped = data.map((r: any) => ({ id: r.code, ...serializeRecord(r) }));
+    const mapped = data.map((item: any) => ({ id: item.code, ...serializeRecord(item) }));
     return { data: mapped, total };
   }
 
@@ -73,9 +74,8 @@ export class EquipmentTypeService {
   }
 
   async update(id: string, dto: UpdateEquipmentTypeDto) {
-    const data: any = { ...(dto as any) };
-    delete data.id;
-    delete data.code;
+    const { id: _pk, code, ...rest } = (dto as any);
+    const data: any = { ...rest };
 
 
 

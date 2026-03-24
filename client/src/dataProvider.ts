@@ -1,7 +1,19 @@
 import { DataProvider, fetchUtils } from 'react-admin';
+import { getValidAccessToken } from './auth/keycloak';
+import { env } from './config/env';
 
-const apiUrl = 'http://localhost:3000';
-const httpClient = fetchUtils.fetchJson;
+const apiUrl = env.apiUrl;
+
+const httpClient = async (url: string, options: fetchUtils.Options = {}) => {
+  const token = await getValidAccessToken();
+  const headers = new Headers(options.headers ?? { Accept: 'application/json' });
+  headers.set('Authorization', `Bearer ${token}`);
+
+  return fetchUtils.fetchJson(url, {
+    ...options,
+    headers,
+  });
+};
 
 function buildQueryString(query: Record<string, unknown>) {
   const search = new URLSearchParams();

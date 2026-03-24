@@ -24,6 +24,7 @@ export class RepairOrderService {
     const take = end - start;
     const skip = start;
     const sortField = query._sort || 'number';
+    const prismaSortField = sortField === 'id' ? 'id' : sortField;
     const sortOrder = (query._order || 'ASC').toLowerCase() as 'asc' | 'desc';
 
     const where: any = {};
@@ -55,7 +56,7 @@ export class RepairOrderService {
     }
 
     const [data, total] = await Promise.all([
-      this.prisma.repairOrder.findMany({ where, skip, take, orderBy: { [sortField]: sortOrder } }),
+      this.prisma.repairOrder.findMany({ where, skip, take, orderBy: { [prismaSortField]: sortOrder } }),
       this.prisma.repairOrder.count({ where }),
     ]);
 

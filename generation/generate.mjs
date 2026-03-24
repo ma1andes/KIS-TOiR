@@ -332,7 +332,7 @@ function renderBackendModule(entityName, entity, resourceName, pk) {
   }
   updateDtoLines.push('}');
 
-  const controller = `import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Res } from '@nestjs/common';\nimport { Response } from 'express';\nimport { ${serviceName} } from './${folder}.service';\nimport { Create${className}Dto } from './dto/create-${folder}.dto';\nimport { Update${className}Dto } from './dto/update-${folder}.dto';\n\n@Controller('${resourceName}')\nexport class ${controllerName} {\n  constructor(private readonly service: ${serviceName}) {}\n\n  @Get()\n  async findAll(@Query() query: any, @Res() res: Response) {\n    const result = await this.service.findAll(query);\n    res.set('Content-Range', \`${resourceName} \${query._start || 0}-\${query._end || result.total}/\${result.total}\`);\n    res.set('Access-Control-Expose-Headers', 'Content-Range');\n    return res.json(result.data);\n  }\n\n  @Get(':${pk}')\n  findOne(@Param('${pk}') id: string) {\n    return this.service.findOne(id);\n  }\n\n  @Post()\n  create(@Body() dto: Create${className}Dto) {\n    return this.service.create(dto);\n  }\n\n  @Patch(':${pk}')\n  update(@Param('${pk}') id: string, @Body() dto: Update${className}Dto) {\n    return this.service.update(id, dto);\n  }\n\n  @Delete(':${pk}')\n  remove(@Param('${pk}') id: string) {\n    return this.service.remove(id);\n  }\n}\n`;
+  const controller = `import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Res } from '@nestjs/common';\nimport { Response } from 'express';\nimport { Roles } from '../../auth/decorators/roles.decorator';\nimport { RealmRole } from '../../auth/roles/realm-role.enum';\nimport { ${serviceName} } from './${folder}.service';\nimport { Create${className}Dto } from './dto/create-${folder}.dto';\nimport { Update${className}Dto } from './dto/update-${folder}.dto';\n\n@Controller('${resourceName}')\nexport class ${controllerName} {\n  constructor(private readonly service: ${serviceName}) {}\n\n  @Roles(RealmRole.Viewer, RealmRole.Editor, RealmRole.Admin)\n  @Get()\n  async findAll(@Query() query: any, @Res() res: Response) {\n    const result = await this.service.findAll(query);\n    res.set('Content-Range', \`${resourceName} \${query._start || 0}-\${query._end || result.total}/\${result.total}\`);\n    res.set('Access-Control-Expose-Headers', 'Content-Range');\n    return res.json(result.data);\n  }\n\n  @Roles(RealmRole.Viewer, RealmRole.Editor, RealmRole.Admin)\n  @Get(':${pk}')\n  findOne(@Param('${pk}') id: string) {\n    return this.service.findOne(id);\n  }\n\n  @Roles(RealmRole.Editor, RealmRole.Admin)\n  @Post()\n  create(@Body() dto: Create${className}Dto) {\n    return this.service.create(dto);\n  }\n\n  @Roles(RealmRole.Editor, RealmRole.Admin)\n  @Patch(':${pk}')\n  update(@Param('${pk}') id: string, @Body() dto: Update${className}Dto) {\n    return this.service.update(id, dto);\n  }\n\n  @Roles(RealmRole.Admin)\n  @Delete(':${pk}')\n  remove(@Param('${pk}') id: string) {\n    return this.service.remove(id);\n  }\n}\n`;
 
   const service = `import { Injectable } from '@nestjs/common';\nimport { Prisma } from '@prisma/client';\nimport { PrismaService } from '../../prisma/prisma.service';\nimport { Create${className}Dto } from './dto/create-${folder}.dto';\nimport { Update${className}Dto } from './dto/update-${folder}.dto';\n\nfunction serializeRecord(record: any) {\n  return {\n    ...record,\n${entity.attributes
       .filter((a) => a.type === 'decimal')
@@ -367,13 +367,31 @@ function renderBackendModule(entityName, entity, resourceName, pk) {
       .map((a) => `    if (data.${a.name} !== undefined && data.${a.name} !== null) data.${a.name} = new Prisma.Decimal(data.${a.name});`)
       .join('\n')}\n\n    const record = await this.prisma.${lowerFirst(className)}.update({ where: { ${pk}: id } as any, data });\n    return ${pk === 'id' ? 'serializeRecord(record)' : `{ id: (record as any).${pk}, ...serializeRecord(record) }`};\n  }\n\n  async remove(id: string) {\n    const record = await this.prisma.${lowerFirst(className)}.delete({ where: { ${pk}: id } as any });\n    return ${pk === 'id' ? 'serializeRecord(record)' : `{ id: (record as any).${pk}, ...serializeRecord(record) }`};\n  }\n}\n`;
 
+  let serviceContent = service
+    .replace(
+      `const sortField = query._sort || '${getBestSortField(entity, pk)}';\n    const sortOrder = (query._order || 'ASC').toLowerCase() as 'asc' | 'desc';`,
+      `const sortField = query._sort || '${getBestSortField(entity, pk)}';\n    const prismaSortField = sortField === 'id' ? '${pk}' : sortField;\n    const sortOrder = (query._order || 'ASC').toLowerCase() as 'asc' | 'desc';`
+    )
+    .replace('orderBy: { [sortField]: sortOrder }', 'orderBy: { [prismaSortField]: sortOrder }')
+    .replace(
+      `data.map((r: any) => ({ id: r.${pk}, ...serializeRecord(r) }))`,
+      `data.map((item: any) => ({ id: item.${pk}, ...serializeRecord(item) }))`
+    );
+
+  if (pk !== 'id') {
+    serviceContent = serviceContent.replace(
+      `const data: any = { ...(dto as any) };\n    delete data.id;\n    delete data.${pk};`,
+      `const { id: _pk, ${pk}, ...rest } = (dto as any);\n    const data: any = { ...rest };`
+    );
+  }
+
   const mod = `import { Module } from '@nestjs/common';\nimport { ${controllerName} } from './${folder}.controller';\nimport { ${serviceName} } from './${folder}.service';\n\n@Module({\n  controllers: [${controllerName}],\n  providers: [${serviceName}],\n})\nexport class ${moduleName} {}\n`;
 
   return {
     folder,
     files: {
       [`server/src/modules/${folder}/${folder}.controller.ts`]: controller,
-      [`server/src/modules/${folder}/${folder}.service.ts`]: service,
+      [`server/src/modules/${folder}/${folder}.service.ts`]: serviceContent,
       [`server/src/modules/${folder}/${folder}.module.ts`]: mod,
       [`server/src/modules/${folder}/dto/create-${folder}.dto.ts`]: createDtoLines.join('\n') + '\n',
       [`server/src/modules/${folder}/dto/update-${folder}.dto.ts`]: updateDtoLines.join('\n') + '\n',
@@ -621,7 +639,7 @@ function main() {
   const args = process.argv.slice(2);
   const apply = args.includes('--apply');
   const dslArgIdx = args.indexOf('--dsl');
-  const dslPath = dslArgIdx >= 0 ? args[dslArgIdx + 1] : 'examples/TOiR.domain.dsl';
+  const dslPath = dslArgIdx >= 0 ? args[dslArgIdx + 1] : 'domain/TOiR.domain.dsl';
 
   const absDsl = path.resolve(ROOT, dslPath);
   const dslText = readFile(absDsl);
