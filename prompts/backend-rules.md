@@ -56,6 +56,20 @@ The backend remains derived from `domain/*.dsl` inside the existing LLM-first pi
   - call `$connect()`
   - do not use `beforeExit`
 
+## Filtering contract
+
+- List endpoints must support React Admin query parameters:
+  - `_start`, `_end`, `_sort`, `_order`
+  - arbitrary field filters from query string
+  - `q` for reference autocomplete search
+- String/text search filters may use `contains` with case-insensitive mode.
+- Foreign key filters must use exact-match semantics (no `contains` for FK scalar keys).
+- Enum filters must support both single and repeated query params:
+  - `status=Draft`
+  - `status=Draft&status=Approved`
+- Repeated enum params must map to Prisma `{ in: [...] }`.
+- Sorting must use real model scalar fields only; natural-key entities must not fallback to fake physical `id`.
+
 ## Reproducibility invariants
 
 - A freshly generated backend must be bootstrappable with ordinary Nest + Prisma commands from `prompts/runtime-rules.md`.

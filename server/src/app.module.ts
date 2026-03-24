@@ -9,8 +9,7 @@ import { EquipmentModule } from './modules/equipment/equipment.module';
 import { RepairOrderModule } from './modules/repair-order/repair-order.module';
 
 @Module({
-  imports: [
-    ConfigModule.forRoot({
+  imports: [ConfigModule.forRoot({
       isGlobal: true,
       validate: validateEnvironment,
     }),

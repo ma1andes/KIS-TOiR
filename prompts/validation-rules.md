@@ -42,6 +42,19 @@ Validation is now a lightweight automated gate instead of a prose-only checklist
   2. OIDC discovery
   3. certs fallback
 
+### Filter checks
+
+- list resources expose filter UI (including `FilterButton`)
+- reference filters use `ReferenceInput` + `AutocompleteInput` with `filterToQuery`
+- data provider preserves repeated query params for array filters
+- backend FK filters keep exact-match semantics
+- enum repeated params are mapped to Prisma `in`
+- typed form mapping is preserved:
+  - `integer` / `decimal` -> `NumberInput`
+  - `date` -> `DateInput`
+- reference fields intended for navigation keep `ReferenceField link="show"`
+- resources keep `show={...}` registration in `App.tsx`
+
 ### Natural-key checks
 
 - response records expose `id`

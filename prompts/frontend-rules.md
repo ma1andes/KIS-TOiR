@@ -25,6 +25,13 @@ The frontend stays a React Admin SPA generated from `domain/*.dsl` and anchored 
 - Each entity becomes a React Admin resource with list/create/edit/show views.
 - Resource names must stay aligned with backend path segments.
 - Foreign keys must use `ReferenceInput` / `ReferenceField`.
+- Foreign keys shown in list/show views must stay clickable via `ReferenceField link="show"` to open full details of the related resource.
+- Lists must expose filters through `List` `filters` and an actions toolbar with `FilterButton`.
+- For enum fields where multi-select is required (for example `status`), use `SelectArrayInput` in list filters.
+- For foreign key filters and form selection use `ReferenceInput` + `AutocompleteInput` with `filterToQuery={(searchText) => ({ q: searchText })}`.
+- Form mapping must stay type-safe:
+  - `integer` / `decimal` -> `NumberInput`
+  - `date` -> `DateInput`
 
 ## Provider seams
 
@@ -43,6 +50,8 @@ The frontend stays a React Admin SPA generated from `domain/*.dsl` and anchored 
 - Every resource record must include `id`.
 - Natural-key resources must preserve route, update, and sort compatibility with React Admin contracts.
 - Frontend requests must continue to work when the real primary key is not named `id`.
+- `dataProvider` query serialization must preserve repeated query params for array filters (for example enum multi-select).
+- `Resource` wiring in `App.tsx` must keep `show={...}` registration for all generated resources.
 
 ## Reproducibility invariants
 
