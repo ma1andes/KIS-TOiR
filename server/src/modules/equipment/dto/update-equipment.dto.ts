@@ -1,4 +1,5 @@
 export class UpdateEquipmentDto {
+  id?: string;
   inventoryNumber?: string;
   serialNumber?: string;
   name?: string;

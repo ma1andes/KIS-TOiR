@@ -1,9 +1,9 @@
 export class CreateEquipmentDto {
-  inventoryNumber: string;
+  inventoryNumber!: string;
   serialNumber?: string;
-  name: string;
-  equipmentTypeCode: string;
-  status?: string;
+  name!: string;
+  equipmentTypeCode!: string;
+  status!: string;
   location?: string;
   commissionedAt?: string;
   totalEngineHours?: string;

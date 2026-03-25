@@ -32,43 +32,43 @@ enum RepairOrderStatus {
 }
 
 model EquipmentType {
-  code                     String          @id
-  name                     String
-  manufacturer             String?
+  code String @id
+  name String
+  manufacturer String?
   maintenanceIntervalHours Int?
-  overhaulIntervalHours    Int?
-  equipment                Equipment[]
+  overhaulIntervalHours Int?
+  equipment Equipment[]
 }
 
 model Equipment {
-  id                          String          @id @default(uuid())
-  inventoryNumber             String          @unique
-  serialNumber                String?
-  name                        String
-  equipmentTypeCode           String
-  equipmentType               EquipmentType   @relation(fields: [equipmentTypeCode], references: [code])
-  status                      EquipmentStatus @default(Active)
-  location                    String?
-  commissionedAt              DateTime?
-  totalEngineHours            Decimal?
-  engineHoursSinceLastRepair  Decimal?
-  lastRepairAt                DateTime?
-  notes                       String?
-  repairOrders                RepairOrder[]
+  id String @id @default(uuid())
+  inventoryNumber String @unique
+  serialNumber String?
+  name String
+  equipmentTypeCode String
+  status EquipmentStatus @default(Active)
+  location String?
+  commissionedAt DateTime?
+  totalEngineHours Decimal?
+  engineHoursSinceLastRepair Decimal?
+  lastRepairAt DateTime?
+  notes String?
+  equipmentType EquipmentType @relation(fields: [equipmentTypeCode], references: [code])
+  repairOrders RepairOrder[]
 }
 
 model RepairOrder {
-  id                   String            @id @default(uuid())
-  number               String            @unique
-  equipmentId          String
-  equipment            Equipment         @relation(fields: [equipmentId], references: [id])
-  repairKind           RepairKind
-  status               RepairOrderStatus @default(Draft)
-  plannedAt            DateTime
-  startedAt            DateTime?
-  completedAt          DateTime?
-  contractor           String?
-  engineHoursAtRepair  Decimal?
-  description          String?
-  notes                String?
+  id String @id @default(uuid())
+  number String @unique
+  equipmentId String
+  repairKind RepairKind
+  status RepairOrderStatus @default(Draft)
+  plannedAt DateTime
+  startedAt DateTime?
+  completedAt DateTime?
+  contractor String?
+  engineHoursAtRepair Decimal?
+  description String?
+  notes String?
+  equipment Equipment @relation(fields: [equipmentId], references: [id])
 }

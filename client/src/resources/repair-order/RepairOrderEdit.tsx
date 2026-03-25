@@ -1,12 +1,4 @@
-import {
-  Edit,
-  SimpleForm,
-  TextInput,
-  NumberInput,
-  DateInput,
-  SelectInput,
-  ReferenceInput,
-} from 'react-admin';
+import { Edit, SimpleForm, TextInput, NumberInput, DateInput, SelectInput, ReferenceInput, AutocompleteInput } from 'react-admin';
 
 const repairKindChoices = [
   { id: 'TO', name: 'Техническое обслуживание' },
@@ -28,19 +20,20 @@ const statusChoices = [
 export const RepairOrderEdit = () => (
   <Edit>
     <SimpleForm>
+      <TextInput source="id" label="id" disabled />
       <TextInput source="number" label="Номер заявки" isRequired />
-      <ReferenceInput source="equipmentId" reference="equipment" label="Оборудование">
-        <SelectInput optionText="name" isRequired />
+      <ReferenceInput source="equipmentId" reference="equipment">
+        <AutocompleteInput label="Оборудование" optionText={(record) => record.inventoryNumber ? `${record.inventoryNumber} — ${record.name ?? record.inventoryNumber}` : (record.name ?? record.id)} filterToQuery={(searchText) => ({ q: searchText })} />
       </ReferenceInput>
-      <SelectInput source="repairKind" label="Вид ремонта" choices={repairKindChoices} isRequired />
-      <SelectInput source="status" label="Статус" choices={statusChoices} />
-      <DateInput source="plannedAt" label="Плановая дата начала" isRequired />
+      <SelectInput source="repairKind" label="Вид ремонта" choices={repairKindChoices} emptyText="Не выбрано" />
+      <SelectInput source="status" label="Статус" choices={statusChoices} emptyText="Не выбрано" />
+      <DateInput source="plannedAt" label="Плановая дата начала" />
       <DateInput source="startedAt" label="Фактическая дата начала" />
       <DateInput source="completedAt" label="Фактическая дата завершения" />
-      <TextInput source="contractor" label="Подрядная организация" />
-      <NumberInput source="engineHoursAtRepair" label="Наработка на момент ремонта (ч)" />
-      <TextInput source="description" label="Описание работ / дефекта" multiline />
-      <TextInput source="notes" label="Примечания" multiline />
+      <TextInput source="contractor" label="Подрядная организация (если внешний ремонт)"  />
+      <NumberInput source="engineHoursAtRepair" label="Наработка на момент ремонта, моточасов" />
+      <TextInput source="description" label="Описание работ / дефекта"  />
+      <TextInput source="notes" label="Примечания"  />
     </SimpleForm>
   </Edit>
 );

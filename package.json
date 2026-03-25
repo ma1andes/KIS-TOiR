@@ -1,0 +1,10 @@
+{
+  "name": "toir-generation-context",
+  "private": true,
+  "scripts": {
+    "generate:domain-summary": "node tools/generate-domain-summary.mjs",
+    "validate:generation": "node tools/validate-generation.mjs",
+    "validate:generation:runtime": "node tools/validate-generation.mjs --run-runtime",
+    "validate:generation:artifacts": "node tools/validate-generation.mjs --artifacts-only"
+  }
+}

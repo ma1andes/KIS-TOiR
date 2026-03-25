@@ -1,7 +1,35 @@
 import { DataProvider, fetchUtils } from 'react-admin';
+import { getValidAccessToken } from './auth/keycloak';
+import { env } from './config/env';
 
-const apiUrl = 'http://localhost:3000';
-const httpClient = fetchUtils.fetchJson;
+const apiUrl = env.apiUrl;
+
+const httpClient = async (url: string, options: fetchUtils.Options = {}) => {
+  const token = await getValidAccessToken();
+  const headers = new Headers(options.headers ?? { Accept: 'application/json' });
+  headers.set('Authorization', `Bearer ${token}`);
+
+  return fetchUtils.fetchJson(url, {
+    ...options,
+    headers,
+  });
+};
+
+function buildQueryString(query: Record<string, unknown>) {
+  const search = new URLSearchParams();
+  Object.entries(query).forEach(([key, val]) => {
+    if (val === undefined || val === null || val === '') return;
+    if (Array.isArray(val)) {
+      val.forEach((v) => {
+        if (v === undefined || v === null || v === '') return;
+        search.append(key, String(v));
+      });
+      return;
+    }
+    search.set(key, String(val));
+  });
+  return search.toString();
+}
 
 const dataProvider: DataProvider = {
   getList: async (resource, params) => {
@@ -10,23 +38,15 @@ const dataProvider: DataProvider = {
     const start = (page - 1) * perPage;
     const end = page * perPage;
 
-    const query: Record<string, string> = {
-      _start: String(start),
-      _end: String(end),
+    const query: Record<string, unknown> = {
+      _start: start,
+      _end: end,
       _sort: field,
       _order: order,
+      ...(params.filter ?? {}),
     };
 
-    if (params.filter) {
-      Object.keys(params.filter).forEach((key) => {
-        const val = params.filter[key];
-        if (val !== undefined && val !== null && val !== '') {
-          query[key] = String(val);
-        }
-      });
-    }
-
-    const queryString = new URLSearchParams(query).toString();
+    const queryString = buildQueryString(query);
     const url = `${apiUrl}/${resource}?${queryString}`;
     const { json, headers } = await httpClient(url);
 
@@ -55,15 +75,16 @@ const dataProvider: DataProvider = {
     const start = (page - 1) * perPage;
     const end = page * perPage;
 
-    const query: Record<string, string> = {
-      _start: String(start),
-      _end: String(end),
+    const query: Record<string, unknown> = {
+      _start: start,
+      _end: end,
       _sort: field,
       _order: order,
-      [params.target]: String(params.id),
+      [params.target]: params.id,
+      ...(params.filter ?? {}),
     };
 
-    const queryString = new URLSearchParams(query).toString();
+    const queryString = buildQueryString(query);
     const url = `${apiUrl}/${resource}?${queryString}`;
     const { json, headers } = await httpClient(url);
 

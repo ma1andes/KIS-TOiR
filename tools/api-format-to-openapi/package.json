@@ -1,0 +1,12 @@
+{
+  "name": "api-format-to-openapi",
+  "private": true,
+  "type": "module",
+  "description": "Конвертация доменного api-format в OpenAPI 3.0 (детерминированно или через LLM)",
+  "scripts": {
+    "convert": "node convert.mjs --in examples/api-format.example.json --out ../../openapi.generated.json",
+    "convert:llm": "node convert.mjs --mode llm --in examples/api-format.example.json --out ../../openapi.llm.json",
+    "demo": "node demo-steps.mjs",
+    "demo:pause": "node demo-steps.mjs --pause"
+  }
+}

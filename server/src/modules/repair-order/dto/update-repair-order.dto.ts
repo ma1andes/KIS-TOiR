@@ -1,4 +1,5 @@
 export class UpdateRepairOrderDto {
+  id?: string;
   number?: string;
   equipmentId?: string;
   repairKind?: string;

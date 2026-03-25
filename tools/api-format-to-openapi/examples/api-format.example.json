@@ -1,0 +1,36 @@
+{
+  "apiFormatVersion": "1",
+  "info": {
+    "title": "TOiR Demo API",
+    "version": "1.0.0",
+    "description": "Абстрактный пример доменного описания API (не OpenAPI)."
+  },
+  "server": {
+    "basePath": "/api"
+  },
+  "security": {
+    "type": "bearer",
+    "scheme": "JWT"
+  },
+  "resources": [
+    {
+      "name": "Equipment",
+      "pathSegment": "equipment",
+      "idParam": "id",
+      "idType": "uuid",
+      "fields": [
+        { "name": "id", "type": "uuid", "readOnly": true },
+        { "name": "inventoryNumber", "type": "string", "required": true },
+        { "name": "name", "type": "string", "required": true },
+        { "name": "status", "type": "enum", "enumValues": ["Active", "Repair", "Decommissioned"] },
+        { "name": "location", "type": "string" }
+      ],
+      "operations": ["list", "get", "create", "update", "delete"],
+      "listQuery": {
+        "pagination": ["_start", "_end"],
+        "sort": ["_sort", "_order"],
+        "filters": ["q", "status"]
+      }
+    }
+  ]
+}
