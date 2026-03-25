@@ -35,3 +35,7 @@ Thumbs.db
 *.njsproj
 *.sln
 *.sw?
+# Generated OpenAPI (local runs; commit only if you want to publish the spec)
+openapi.generated.json
+openapi.llm.json
+tools/api-format-to-openapi/demo-output/

@@ -670,15 +670,53 @@ function ensureClientApp(apply, frontendResources) {
   });
 }
 
+/** Собирает файлы как при --apply, без записи. Учитывает текущие app.module.ts и App.tsx на диске. */
+function collectGeneratedBundle(parsed) {
+  const files = {};
+  const prismaPath = path.join(ROOT, 'server/prisma/schema.prisma');
+  const pr = ensurePrismaSchema(parsed, prismaPath, false);
+  files['server/prisma/schema.prisma'] = pr.content;
+
+  const backendModules = [];
+  const frontendResources = [];
+  for (const [entityName, ent] of Object.entries(parsed.entities)) {
+    const pk = ent.primaryKey;
+    const resource = pluralize(toKebab(entityName));
+    const be = renderBackendModule(entityName, ent, resource, pk);
+    const fe = renderFrontendResource(entityName, ent, resource, pk, parsed.enums);
+    backendModules.push(be);
+    frontendResources.push(fe);
+    Object.assign(files, be.files, fe.files);
+  }
+
+  const appMod = ensureAppModule(false, backendModules);
+  files['server/src/app.module.ts'] = appMod.content;
+  const clientApp = ensureClientApp(false, frontendResources);
+  files['client/src/App.tsx'] = clientApp.content;
+
+  return {
+    entityCount: Object.keys(parsed.entities).length,
+    enumCount: Object.keys(parsed.enums).length,
+    files,
+  };
+}
+
 function main() {
   const args = process.argv.slice(2);
   const apply = args.includes('--apply');
+  const printBundleJson = args.includes('--print-bundle-json');
   const dslArgIdx = args.indexOf('--dsl');
   const dslPath = dslArgIdx >= 0 ? args[dslArgIdx + 1] : 'domain/TOiR.domain.dsl';
 
   const absDsl = path.resolve(ROOT, dslPath);
   const dslText = readFile(absDsl);
   const parsed = parseDomainDSL(dslText);
+
+  if (printBundleJson) {
+    const bundle = collectGeneratedBundle(parsed);
+    process.stdout.write(JSON.stringify(bundle));
+    return;
+  }
 
   // Prisma schema
   const prismaPath = path.join(ROOT, 'server/prisma/schema.prisma');

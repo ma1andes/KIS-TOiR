@@ -62,3 +62,7 @@ npm run validate:generation:runtime
 ```
 
 `npm run validate:generation` now checks both contract shape and workspace validity. When dependencies are installed, it also verifies `npm run build` in `server/` and `client/`. If dependencies are missing, it reports build verification as skipped instead of pretending the baseline is fully green.
+
+## AID export (OpenAPI + app generator)
+
+HTTP-экспортёры для интеграции с AID: **`POST /aid/export/openapi`** (api-format → OpenAPI 3.0) и **`POST /aid/export/app`** (DSL → бандл файлов или `--apply`). Подробно: **[docs/AID_EXPORT_README.md](docs/AID_EXPORT_README.md)**.

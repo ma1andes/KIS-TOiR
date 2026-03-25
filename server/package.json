@@ -19,6 +19,7 @@
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "generate:from-dsl": "node ../generation/generate.mjs --apply --dsl domain/TOiR.domain.dsl",
+    "generate:bundle-json": "node ../generation/generate.mjs --print-bundle-json --dsl domain/TOiR.domain.dsl",
     "postinstall": "prisma generate"
   },
   "prisma": {
