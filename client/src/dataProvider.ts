@@ -1,4 +1,4 @@
-import { DataProvider, fetchUtils } from 'react-admin';
+import { DataProvider, fetchUtils, HttpError } from 'react-admin';
 import { getValidAccessToken } from './auth/keycloak';
 import { env } from './config/env';
 
@@ -9,10 +9,31 @@ const httpClient = async (url: string, options: fetchUtils.Options = {}) => {
   const headers = new Headers(options.headers ?? { Accept: 'application/json' });
   headers.set('Authorization', `Bearer ${token}`);
 
-  return fetchUtils.fetchJson(url, {
-    ...options,
-    headers,
-  });
+  try {
+    return await fetchUtils.fetchJson(url, {
+      ...options,
+      headers,
+    });
+  } catch (error: unknown) {
+    const e = error as {
+      status?: number;
+      body?: {
+        message?: string | string[];
+        details?: unknown;
+      };
+      message?: string;
+    };
+    const messageFromBody = e?.body?.message;
+    const normalizedMessage = Array.isArray(messageFromBody)
+      ? messageFromBody.join(', ')
+      : messageFromBody;
+
+    throw new HttpError(
+      normalizedMessage || e?.message || 'Request failed',
+      e?.status ?? 500,
+      e?.body,
+    );
+  }
 };
 
 function buildQueryString(query: Record<string, unknown>) {

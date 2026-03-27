@@ -287,15 +287,6 @@ function renderBackendModule(entityName, entity, resourceName, pk) {
   const folder = toKebab(entityName);
 
   // DTOs
-  const enumTypes = entity.attributes
-    .filter((a) => !['string', 'text', 'uuid', 'integer', 'decimal', 'date'].includes(a.type))
-    .map((a) => a.type);
-
-  const enumUnion = (typeName) => {
-    // Unknown labels in DSL aren't needed; keep as string union to avoid importing Prisma enums.
-    return `'${typeName}'`;
-  };
-
   const dtoType = (attr) => {
     switch (attr.type) {
       case 'uuid':
@@ -314,23 +305,96 @@ function renderBackendModule(entityName, entity, resourceName, pk) {
     }
   };
 
+  const getValidationDecorators = (attr, isUpdate) => {
+    const decorators = [];
+    const imports = new Set();
+    let needsTypeImport = false;
+    const field = attr.name;
+    if (isUpdate) {
+      decorators.push('@IsOptional()');
+      imports.add('IsOptional');
+    }
+
+    switch (attr.type) {
+      case 'uuid':
+        decorators.push(`@IsUUID(undefined, { message: '${field}: должно быть UUID' })`);
+        imports.add('IsUUID');
+        break;
+      case 'string':
+      case 'text':
+        decorators.push(`@IsString({ message: '${field}: должно быть строкой' })`);
+        imports.add('IsString');
+        break;
+      case 'integer':
+        decorators.push('@Type(() => Number)');
+        decorators.push(`@IsInt({ message: '${field}: должно быть целым числом' })`);
+        imports.add('IsInt');
+        needsTypeImport = true;
+        break;
+      case 'decimal':
+        decorators.push(`@IsNumberString({}, { message: '${field}: должно быть числом' })`);
+        imports.add('IsNumberString');
+        break;
+      case 'date':
+        decorators.push(`@IsISO8601({}, { message: '${field}: должно содержать корректную дату' })`);
+        imports.add('IsISO8601');
+        break;
+      default:
+        // enum (kept as string in generated DTOs)
+        decorators.push(`@IsString({ message: '${field}: должно быть строкой' })`);
+        imports.add('IsString');
+        break;
+    }
+
+    if (!isUpdate && attr.isRequired && !(attr.isPrimary && attr.type === 'uuid')) {
+      decorators.push(`@IsNotEmpty({ message: '${field}: обязательное поле' })`);
+      imports.add('IsNotEmpty');
+    }
+    return { decorators, imports, needsTypeImport };
+  };
+
+  const createDecorators = new Set();
+  const updateDecorators = new Set(['IsOptional']);
+  let createNeedsTypeImport = false;
+  let updateNeedsTypeImport = false;
+
   const createDtoLines = [];
-  createDtoLines.push(`export class Create${className}Dto {`);
   for (const a of entity.attributes) {
     if (a.isPrimary && a.type === 'uuid') continue; // generated
+    const { decorators, imports, needsTypeImport } = getValidationDecorators(a, false);
+    imports.forEach((i) => createDecorators.add(i));
+    if (needsTypeImport) createNeedsTypeImport = true;
+    decorators.forEach((d) => createDtoLines.push(`  ${d}`));
     const opt = a.isRequired && !(a.isPrimary && a.type !== 'uuid') ? '!' : '?';
     createDtoLines.push(`  ${a.name}${opt}: ${dtoType(a)};`);
   }
-  createDtoLines.push('}');
 
   const updateDtoLines = [];
-  updateDtoLines.push(`export class Update${className}Dto {`);
-  if (pk !== 'id') updateDtoLines.push(`  id?: string;`);
+  if (pk !== 'id') {
+    updateDtoLines.push('  @IsOptional()');
+    updateDtoLines.push(`  @IsString({ message: 'id: должно быть строкой' })`);
+    updateDtoLines.push('  id?: string;');
+    updateDecorators.add('IsString');
+  }
   for (const a of entity.attributes) {
     if (pk !== 'id' && a.name === 'id') continue;
+    const { decorators, imports, needsTypeImport } = getValidationDecorators(a, true);
+    imports.forEach((i) => updateDecorators.add(i));
+    if (needsTypeImport) updateNeedsTypeImport = true;
+    decorators.forEach((d) => updateDtoLines.push(`  ${d}`));
     updateDtoLines.push(`  ${a.name}?: ${dtoType(a)};`);
   }
-  updateDtoLines.push('}');
+
+  const createImports = Array.from(createDecorators)
+    .filter(Boolean)
+    .sort()
+    .join(', ');
+  const updateImports = Array.from(updateDecorators)
+    .filter(Boolean)
+    .sort()
+    .join(', ');
+  const createDto = `import { ${createImports} } from 'class-validator';\n${createNeedsTypeImport ? "import { Type } from 'class-transformer';\n" : ''}\nexport class Create${className}Dto {\n${createDtoLines.join('\n')}\n}\n`;
+  const updateDto = `import { ${updateImports} } from 'class-validator';\n${updateNeedsTypeImport ? "import { Type } from 'class-transformer';\n" : ''}\nexport class Update${className}Dto {\n${updateDtoLines.join('\n')}\n}\n`;
 
   const controller = `import { Controller, Get, Post, Patch, Delete, Param, Body, Query, Res } from '@nestjs/common';\nimport { Response } from 'express';\nimport { Roles } from '../../auth/decorators/roles.decorator';\nimport { RealmRole } from '../../auth/roles/realm-role.enum';\nimport { ${serviceName} } from './${folder}.service';\nimport { Create${className}Dto } from './dto/create-${folder}.dto';\nimport { Update${className}Dto } from './dto/update-${folder}.dto';\n\n@Controller('${resourceName}')\nexport class ${controllerName} {\n  constructor(private readonly service: ${serviceName}) {}\n\n  @Roles(RealmRole.Viewer, RealmRole.Editor, RealmRole.Admin)\n  @Get()\n  async findAll(@Query() query: any, @Res() res: Response) {\n    const result = await this.service.findAll(query);\n    res.set('Content-Range', \`${resourceName} \${query._start || 0}-\${query._end || result.total}/\${result.total}\`);\n    res.set('Access-Control-Expose-Headers', 'Content-Range');\n    return res.json(result.data);\n  }\n\n  @Roles(RealmRole.Viewer, RealmRole.Editor, RealmRole.Admin)\n  @Get(':${pk}')\n  findOne(@Param('${pk}') id: string) {\n    return this.service.findOne(id);\n  }\n\n  @Roles(RealmRole.Editor, RealmRole.Admin)\n  @Post()\n  create(@Body() dto: Create${className}Dto) {\n    return this.service.create(dto);\n  }\n\n  @Roles(RealmRole.Editor, RealmRole.Admin)\n  @Patch(':${pk}')\n  update(@Param('${pk}') id: string, @Body() dto: Update${className}Dto) {\n    return this.service.update(id, dto);\n  }\n\n  @Roles(RealmRole.Admin)\n  @Delete(':${pk}')\n  remove(@Param('${pk}') id: string) {\n    return this.service.remove(id);\n  }\n}\n`;
 
@@ -393,8 +457,8 @@ function renderBackendModule(entityName, entity, resourceName, pk) {
       [`server/src/modules/${folder}/${folder}.controller.ts`]: controller,
       [`server/src/modules/${folder}/${folder}.service.ts`]: serviceContent,
       [`server/src/modules/${folder}/${folder}.module.ts`]: mod,
-      [`server/src/modules/${folder}/dto/create-${folder}.dto.ts`]: createDtoLines.join('\n') + '\n',
-      [`server/src/modules/${folder}/dto/update-${folder}.dto.ts`]: updateDtoLines.join('\n') + '\n',
+      [`server/src/modules/${folder}/dto/create-${folder}.dto.ts`]: createDto,
+      [`server/src/modules/${folder}/dto/update-${folder}.dto.ts`]: updateDto,
     },
     moduleName,
     importPath: `./modules/${folder}/${folder}.module`,
