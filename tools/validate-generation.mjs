@@ -135,6 +135,10 @@ function validateBuildChecks() {
     'prompts/frontend-rules.md',
     'prompts/runtime-rules.md',
     'prompts/validation-rules.md',
+    'generation/templates/runtime/main.ts',
+    'generation/templates/runtime/api-exception.filter.ts',
+    'generation/templates/runtime/dataProvider.ts',
+    'generation/templates/runtime/AppNotification.tsx',
   ]);
 
   const dslFiles = getDslFiles(rootDir).map((filePath) => path.relative(rootDir, filePath).replaceAll('\\', '/'));
@@ -238,6 +242,38 @@ function validateAuthChecks() {
   assertCondition(/KEYCLOAK_JWKS_URL/.test(authService), 'Backend auth must support explicit KEYCLOAK_JWKS_URL');
   assertCondition(/\.well-known\/openid-configuration/.test(authService), 'Backend auth must try OIDC discovery before fallback certs');
   assertCondition(/protocol\/openid-connect\/certs/.test(authService), 'Backend auth must keep Keycloak certs fallback resolution');
+}
+
+function validateApiErrorContractChecks() {
+  requireFiles([
+    'server/src/common/field-labels.generated.ts',
+    'server/src/common/filters/api-exception.filter.ts',
+  ]);
+  requireContent(
+    'server/src/main.ts',
+    /field-labels\.generated/,
+    'main.ts must import DSL-generated FIELD_LABELS',
+  );
+  requireContent(
+    'server/src/common/filters/api-exception.filter.ts',
+    /message:\s*string\s*\|\s*string\[\]/,
+    'Error JSON must allow message: string | string[]',
+  );
+  requireContent(
+    'server/src/common/filters/api-exception.filter.ts',
+    /Внутренняя ошибка сервера/,
+    'Unexpected server errors must use a generic user-facing message',
+  );
+  requireContent(
+    'client/src/dataProvider.ts',
+    /ApiErrorBody/,
+    'dataProvider must document API error payload shape (ApiErrorBody)',
+  );
+  const dataProviderSource = read('client/src/dataProvider.ts');
+  assertCondition(
+    !dataProviderSource.includes(".split(', ')"),
+    'dataProvider must not split API error strings on comma+space (breaks messages that contain commas)',
+  );
 }
 
 function validateNaturalKeyChecks() {
@@ -484,6 +520,7 @@ function validateRuntimeExecutionChecks() {
 
 validateBuildChecks();
 validateAuthChecks();
+validateApiErrorContractChecks();
 validateNaturalKeyChecks();
 validateRealmChecks();
 validateRuntimeContractChecks();

@@ -7,6 +7,14 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const ROOT = path.resolve(__dirname, '..');
+/** Canonical runtime files for API errors + RA dataProvider; copied into server/ and client/ on each generate --apply. */
+const RUNTIME_TEMPLATE_DIR = path.join(__dirname, 'templates', 'runtime');
+const RUNTIME_TEMPLATE_FILES = [
+  ['api-exception.filter.ts', 'server/src/common/filters/api-exception.filter.ts'],
+  ['dataProvider.ts', 'client/src/dataProvider.ts'],
+  ['AppNotification.tsx', 'client/src/AppNotification.tsx'],
+  ['main.ts', 'server/src/main.ts'],
+];
 
 function readFile(p) {
   return fs.readFileSync(p, 'utf8');
@@ -178,6 +186,7 @@ function getReferenceDisplayExpr(foreignEntity) {
 
 function getAttributeLabel(attr, allEntities) {
   if (attr.label && attr.label !== attr.name) return attr.label;
+  if (attr.name === 'id' && attr.type === 'uuid') return 'Идентификатор';
   if (attr.name === 'status') return 'Статус';
   if (attr.name === 'equipmentId') return 'Оборудование';
   if (attr.name === 'equipmentTypeCode') return 'Вид оборудования';
@@ -260,6 +269,55 @@ function generatePrismaModel(name, entity, allEntities) {
   return `${lines.join('\n')}\n`;
 }
 
+/** Human-readable field labels for ValidationPipe messages (derived from DSL descriptions). */
+function renderFieldLabelsGenerated(parsed) {
+  const { entities } = parsed;
+  const map = new Map();
+  for (const ent of Object.values(entities)) {
+    for (const a of ent.attributes) {
+      const label = getAttributeLabel(a, entities);
+      const prev = map.get(a.name);
+      if (prev === undefined) {
+        map.set(a.name, label);
+      } else if (String(label).length > String(prev).length) {
+        map.set(a.name, label);
+      }
+    }
+  }
+  const keys = [...map.keys()].sort();
+  const lines = keys.map((k) => `  ${JSON.stringify(k)}: ${JSON.stringify(map.get(k))},`);
+  return `/** AUTO-GENERATED from domain DSL (generation/generate.mjs). Do not edit by hand. */\nexport const FIELD_LABELS: Record<string, string> = {\n${lines.join('\n')}\n};\n`;
+}
+
+function ensureFieldLabels(parsed, apply) {
+  const rel = 'server/src/common/field-labels.generated.ts';
+  const content = renderFieldLabelsGenerated(parsed);
+  if (apply) writeFile(path.join(ROOT, rel), content);
+  return { rel, content };
+}
+
+function loadRuntimeTemplateFiles() {
+  const out = {};
+  for (const [name, rel] of RUNTIME_TEMPLATE_FILES) {
+    const abs = path.join(RUNTIME_TEMPLATE_DIR, name);
+    if (!fs.existsSync(abs)) {
+      throw new Error(`Missing generator runtime template: ${abs}`);
+    }
+    out[rel] = readFile(abs);
+  }
+  return out;
+}
+
+function applyRuntimeTemplateFiles(apply) {
+  const files = loadRuntimeTemplateFiles();
+  if (apply) {
+    for (const [rel, content] of Object.entries(files)) {
+      writeFile(path.join(ROOT, rel), content);
+    }
+  }
+  return files;
+}
+
 function ensurePrismaSchema({ enums, entities }, prismaPath, apply) {
   const existing = fs.existsSync(prismaPath) ? readFile(prismaPath) : '';
   const hasGenerator = /generator\s+client\s*\{/m.test(existing);
@@ -279,7 +337,7 @@ function ensurePrismaSchema({ enums, entities }, prismaPath, apply) {
   return { changed: true, content: next };
 }
 
-function renderBackendModule(entityName, entity, resourceName, pk) {
+function renderBackendModule(entityName, entity, resourceName, pk, enums) {
   const className = entityName;
   const moduleName = `${className}Module`;
   const serviceName = `${className}Service`;
@@ -296,7 +354,7 @@ function renderBackendModule(entityName, entity, resourceName, pk) {
       case 'integer':
         return 'number';
       case 'decimal':
-        return 'string';
+        return 'number';
       case 'date':
         return 'string';
       default:
@@ -332,18 +390,31 @@ function renderBackendModule(entityName, entity, resourceName, pk) {
         needsTypeImport = true;
         break;
       case 'decimal':
-        decorators.push(`@IsNumberString({}, { message: '${field}: должно быть числом' })`);
-        imports.add('IsNumberString');
+        decorators.push('@Type(() => Number)');
+        decorators.push(
+          `@IsNumber({ allowNaN: false, allowInfinity: false }, { message: '${field}: должно быть числом' })`,
+        );
+        imports.add('IsNumber');
+        needsTypeImport = true;
         break;
       case 'date':
         decorators.push(`@IsISO8601({}, { message: '${field}: должно содержать корректную дату' })`);
         imports.add('IsISO8601');
         break;
-      default:
-        // enum (kept as string in generated DTOs)
-        decorators.push(`@IsString({ message: '${field}: должно быть строкой' })`);
-        imports.add('IsString');
+      default: {
+        const vals = enums?.[attr.type]?.values;
+        if (vals && vals.length) {
+          const list = vals.map((v) => `'${v}'`).join(', ');
+          decorators.push(
+            `@IsIn([${list}], { message: '${field}: недопустимое значение' })`,
+          );
+          imports.add('IsIn');
+        } else {
+          decorators.push(`@IsString({ message: '${field}: должно быть строкой' })`);
+          imports.add('IsString');
+        }
         break;
+      }
     }
 
     if (!isUpdate && attr.isRequired && !(attr.isPrimary && attr.type === 'uuid')) {
@@ -730,6 +801,22 @@ function ensureClientApp(apply, frontendResources) {
         );
       }
     }
+    if (!out.includes("from './AppNotification'")) {
+      out = out.replace(
+        /import authProvider from '\.\/auth\/authProvider';/,
+        `import authProvider from './auth/authProvider';\nimport { AppNotification } from './AppNotification';`,
+      );
+    }
+    if (!out.includes('notification={AppNotification}')) {
+      out = out.replace(
+        /<Admin dataProvider=\{dataProvider\} authProvider=\{authProvider\} requireAuth>/,
+        '<Admin\n    dataProvider={dataProvider}\n    authProvider={authProvider}\n    notification={AppNotification}\n    requireAuth\n  >',
+      );
+      out = out.replace(
+        /(<Admin\n\s*dataProvider=\{dataProvider\}\n\s*authProvider=\{authProvider\})(\n\s*requireAuth)/,
+        '$1\n    notification={AppNotification}$2',
+      );
+    }
     return out;
   });
 }
@@ -741,13 +828,23 @@ function collectGeneratedBundle(parsed) {
   const pr = ensurePrismaSchema(parsed, prismaPath, false);
   files['server/prisma/schema.prisma'] = pr.content;
 
+  const fieldLabels = ensureFieldLabels(parsed, false);
+  files[fieldLabels.rel] = fieldLabels.content;
+
   const backendModules = [];
   const frontendResources = [];
   for (const [entityName, ent] of Object.entries(parsed.entities)) {
     const pk = ent.primaryKey;
     const resource = pluralize(toKebab(entityName));
-    const be = renderBackendModule(entityName, ent, resource, pk);
-    const fe = renderFrontendResource(entityName, ent, resource, pk, parsed.enums);
+    const be = renderBackendModule(entityName, ent, resource, pk, parsed.enums);
+    const fe = renderFrontendResource(
+      entityName,
+      ent,
+      resource,
+      pk,
+      parsed.enums,
+      parsed.entities,
+    );
     backendModules.push(be);
     frontendResources.push(fe);
     Object.assign(files, be.files, fe.files);
@@ -757,6 +854,8 @@ function collectGeneratedBundle(parsed) {
   files['server/src/app.module.ts'] = appMod.content;
   const clientApp = ensureClientApp(false, frontendResources);
   files['client/src/App.tsx'] = clientApp.content;
+
+  Object.assign(files, loadRuntimeTemplateFiles());
 
   return {
     entityCount: Object.keys(parsed.entities).length,
@@ -785,6 +884,7 @@ function main() {
   // Prisma schema
   const prismaPath = path.join(ROOT, 'server/prisma/schema.prisma');
   ensurePrismaSchema(parsed, prismaPath, apply);
+  ensureFieldLabels(parsed, apply);
 
   // Backend modules + frontend resources
   const backendModules = [];
@@ -792,7 +892,7 @@ function main() {
   for (const [entityName, ent] of Object.entries(parsed.entities)) {
     const pk = ent.primaryKey;
     const resource = pluralize(toKebab(entityName));
-    const be = renderBackendModule(entityName, ent, resource, pk);
+    const be = renderBackendModule(entityName, ent, resource, pk, parsed.enums);
     const fe = renderFrontendResource(entityName, ent, resource, pk, parsed.enums, parsed.entities);
     backendModules.push(be);
     frontendResources.push(fe);
@@ -805,6 +905,7 @@ function main() {
 
   ensureAppModule(apply, backendModules);
   ensureClientApp(apply, frontendResources);
+  applyRuntimeTemplateFiles(apply);
 
   process.stdout.write(
     `${apply ? 'Generated' : 'Planned'} ${Object.keys(parsed.entities).length} entities from ${dslPath}\n`

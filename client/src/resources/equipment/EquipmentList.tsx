@@ -47,7 +47,7 @@ const EquipmentListActions = () => (
 export const EquipmentList = () => (
   <List actions={<EquipmentListActions />} filters={equipmentFilters} sort={{ field: 'inventoryNumber', order: 'ASC' }}>
     <Datagrid rowClick="show">
-      <TextField source="id" label="id" />
+      <TextField source="id" label="Идентификатор" />
       <TextField source="inventoryNumber" label="Инвентарный номер" />
       <TextField source="serialNumber" label="Заводской (серийный) номер" />
       <TextField source="name" label="Наименование единицы оборудования" />

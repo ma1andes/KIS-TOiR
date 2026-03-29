@@ -80,7 +80,7 @@ X-AID-Export-Key: <если задан AID_EXPORT_API_KEY>
 }
 ```
 
-- **`apply: false`** (рекомендуется для AID): в ответе **`files`** — объект «путь от корня репо → текст файла». Диск на сервере не меняется.
+- **`apply: false`** (рекомендуется для AID): в ответе **`files`** — объект «путь от корня репо → текст файла». Диск на сервере не меняется. В бандл входят сгенерированные модули, `App.tsx`, **`server/src/common/field-labels.generated.ts`** (из DSL) и **канонические шаблоны рантайма** из **`generation/templates/runtime/`** (копируются в `server/src/main.ts`, `ApiExceptionFilter`, `dataProvider`, `AppNotification` при `npm run generate:from-dsl`).
 - **`apply: true`**: выполняется запись файлов как у `npm run generate:from-dsl` с `--apply`; нужен **`AID_GENERATOR_ALLOW_APPLY=1`**.
 
 **Ответ (бандл):** `{ "applied": false, "entityCount": N, "enumCount": M, "files": { ... } }`  

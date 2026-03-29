@@ -1,6 +1,7 @@
 import { Admin, Resource } from 'react-admin';
 import dataProvider from './dataProvider';
 import authProvider from './auth/authProvider';
+import { AppNotification } from './AppNotification';
 
 import { EquipmentTypeList } from './resources/equipment-type/EquipmentTypeList';
 import { EquipmentTypeCreate } from './resources/equipment-type/EquipmentTypeCreate';
@@ -18,7 +19,12 @@ import { RepairOrderEdit } from './resources/repair-order/RepairOrderEdit';
 import { RepairOrderShow } from './resources/repair-order/RepairOrderShow';
 
 const App = () => (
-  <Admin dataProvider={dataProvider} authProvider={authProvider} requireAuth>
+  <Admin
+    dataProvider={dataProvider}
+    authProvider={authProvider}
+    notification={AppNotification}
+    requireAuth
+  >
     <Resource
       name="equipment-types"
       options={{ label: 'Виды оборудования' }}

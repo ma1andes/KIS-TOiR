@@ -10,7 +10,7 @@ const statusChoices = [
 export const EquipmentEdit = () => (
   <Edit>
     <SimpleForm>
-      <TextInput source="id" label="id" disabled />
+      <TextInput source="id" label="Идентификатор" disabled />
       <TextInput source="inventoryNumber" label="Инвентарный номер" isRequired />
       <TextInput source="serialNumber" label="Заводской (серийный) номер"  />
       <TextInput source="name" label="Наименование единицы оборудования" isRequired />

@@ -58,7 +58,7 @@ const RepairOrderListActions = () => (
 export const RepairOrderList = () => (
   <List actions={<RepairOrderListActions />} filters={repairOrderFilters} sort={{ field: 'number', order: 'ASC' }}>
     <Datagrid rowClick="show">
-      <TextField source="id" label="id" />
+      <TextField source="id" label="Идентификатор" />
       <TextField source="number" label="Номер заявки" />
       <ReferenceField source="equipmentId" reference="equipment" label="Оборудование" link="show">
         <TextField source="inventoryNumber" />

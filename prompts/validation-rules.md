@@ -87,6 +87,16 @@ Validation is now a lightweight automated gate instead of a prose-only checklist
   - `npx prisma migrate dev`
   - `npx prisma db seed`
 
+### API error contract (backend ↔ frontend)
+
+- Backend errors use the shared `ApiExceptionFilter` shape: `statusCode`, `message` (**`string` or `string[]`** — для списков ошибок валидации), `code`, optional `details`, `path`, `timestamp`.
+- Список ошибок валидации отдаётся в JSON как **`message: string[]`**, без склейки через `", "` на сервере (клиент сам склеивает для UI, например через `\n`).
+- Клиентский `dataProvider` не должен резать одну строку `message` по запятым — только обрабатывать массив или целую строку.
+- Подписи полей для русских сообщений `ValidationPipe` генерируются из DSL в **`server/src/common/field-labels.generated.ts`** (не дублировать огромный словарь вручную в `main.ts`).
+- Поля DSL `decimal` в DTO принимают **число** (как шлёт React Admin `NumberInput`); в сервисе конвертация в `Prisma.Decimal` сохраняется.
+- Атрибуты-enum в DTO валидируются **`@IsIn([...])`** по значениям enum из DSL, а не только `@IsString`.
+- Бандл AID (`collectGeneratedBundle`) включает копии **`generation/templates/runtime/*`** (`main.ts`, `api-exception.filter.ts`, `dataProvider.ts`, `AppNotification.tsx`) — это канонический источник для шва ошибок; при `--apply` они перезаписываются в `server/` и `client/`.
+
 ### Scaffold checks
 
 - backend initialization starts from official Nest CLI scaffolding

@@ -9,7 +9,7 @@ const statusChoices = [
 export const EquipmentShow = () => (
   <Show>
     <SimpleShowLayout>
-      <TextField source="id" label="id" />
+      <TextField source="id" label="Идентификатор" />
       <TextField source="inventoryNumber" label="Инвентарный номер" />
       <TextField source="serialNumber" label="Заводской (серийный) номер" />
       <TextField source="name" label="Наименование единицы оборудования" />

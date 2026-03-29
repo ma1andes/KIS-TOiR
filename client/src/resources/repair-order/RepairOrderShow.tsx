@@ -19,7 +19,7 @@ const statusChoices = [
 export const RepairOrderShow = () => (
   <Show>
     <SimpleShowLayout>
-      <TextField source="id" label="id" />
+      <TextField source="id" label="Идентификатор" />
       <TextField source="number" label="Номер заявки" />
       <ReferenceField source="equipmentId" reference="equipment" label="Оборудование" link="show">
         <TextField source="inventoryNumber" />

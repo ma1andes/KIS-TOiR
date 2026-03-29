@@ -20,7 +20,7 @@ const statusChoices = [
 export const RepairOrderEdit = () => (
   <Edit>
     <SimpleForm>
-      <TextInput source="id" label="id" disabled />
+      <TextInput source="id" label="Идентификатор" disabled />
       <TextInput source="number" label="Номер заявки" isRequired />
       <ReferenceInput source="equipmentId" reference="equipment">
         <AutocompleteInput label="Оборудование" optionText={(record) => record.inventoryNumber ? `${record.inventoryNumber} — ${record.name ?? record.inventoryNumber}` : (record.name ?? record.id)} filterToQuery={(searchText) => ({ q: searchText })} />

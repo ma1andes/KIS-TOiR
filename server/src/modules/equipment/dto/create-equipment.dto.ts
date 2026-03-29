@@ -1,4 +1,5 @@
-import { IsISO8601, IsNotEmpty, IsNumberString, IsString } from 'class-validator';
+import { IsISO8601, IsIn, IsNotEmpty, IsNumber, IsString } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateEquipmentDto {
   @IsString({ message: 'inventoryNumber: должно быть строкой' })
@@ -12,17 +13,19 @@ export class CreateEquipmentDto {
   @IsString({ message: 'equipmentTypeCode: должно быть строкой' })
   @IsNotEmpty({ message: 'equipmentTypeCode: обязательное поле' })
   equipmentTypeCode!: string;
-  @IsString({ message: 'status: должно быть строкой' })
+  @IsIn(['Active', 'Repair', 'Reserve', 'WriteOff'], { message: 'status: недопустимое значение' })
   @IsNotEmpty({ message: 'status: обязательное поле' })
   status!: string;
   @IsString({ message: 'location: должно быть строкой' })
   location?: string;
   @IsISO8601({}, { message: 'commissionedAt: должно содержать корректную дату' })
   commissionedAt?: string;
-  @IsNumberString({}, { message: 'totalEngineHours: должно быть числом' })
-  totalEngineHours?: string;
-  @IsNumberString({}, { message: 'engineHoursSinceLastRepair: должно быть числом' })
-  engineHoursSinceLastRepair?: string;
+  @Type(() => Number)
+  @IsNumber({ allowNaN: false, allowInfinity: false }, { message: 'totalEngineHours: должно быть числом' })
+  totalEngineHours?: number;
+  @Type(() => Number)
+  @IsNumber({ allowNaN: false, allowInfinity: false }, { message: 'engineHoursSinceLastRepair: должно быть числом' })
+  engineHoursSinceLastRepair?: number;
   @IsISO8601({}, { message: 'lastRepairAt: должно содержать корректную дату' })
   lastRepairAt?: string;
   @IsString({ message: 'notes: должно быть строкой' })

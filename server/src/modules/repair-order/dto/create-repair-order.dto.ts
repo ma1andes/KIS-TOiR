@@ -1,4 +1,5 @@
-import { IsISO8601, IsNotEmpty, IsNumberString, IsString, IsUUID } from 'class-validator';
+import { IsISO8601, IsIn, IsNotEmpty, IsNumber, IsString, IsUUID } from 'class-validator';
+import { Type } from 'class-transformer';
 
 export class CreateRepairOrderDto {
   @IsString({ message: 'number: должно быть строкой' })
@@ -7,10 +8,10 @@ export class CreateRepairOrderDto {
   @IsUUID(undefined, { message: 'equipmentId: должно быть UUID' })
   @IsNotEmpty({ message: 'equipmentId: обязательное поле' })
   equipmentId!: string;
-  @IsString({ message: 'repairKind: должно быть строкой' })
+  @IsIn(['TO', 'TR', 'TRE', 'KR', 'AR', 'MP'], { message: 'repairKind: недопустимое значение' })
   @IsNotEmpty({ message: 'repairKind: обязательное поле' })
   repairKind!: string;
-  @IsString({ message: 'status: должно быть строкой' })
+  @IsIn(['Draft', 'Approved', 'InWork', 'Done', 'Cancelled'], { message: 'status: недопустимое значение' })
   @IsNotEmpty({ message: 'status: обязательное поле' })
   status!: string;
   @IsISO8601({}, { message: 'plannedAt: должно содержать корректную дату' })
@@ -22,8 +23,9 @@ export class CreateRepairOrderDto {
   completedAt?: string;
   @IsString({ message: 'contractor: должно быть строкой' })
   contractor?: string;
-  @IsNumberString({}, { message: 'engineHoursAtRepair: должно быть числом' })
-  engineHoursAtRepair?: string;
+  @Type(() => Number)
+  @IsNumber({ allowNaN: false, allowInfinity: false }, { message: 'engineHoursAtRepair: должно быть числом' })
+  engineHoursAtRepair?: number;
   @IsString({ message: 'description: должно быть строкой' })
   description?: string;
   @IsString({ message: 'notes: должно быть строкой' })

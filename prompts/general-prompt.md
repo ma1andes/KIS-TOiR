@@ -140,6 +140,7 @@ COMPLETION INVARIANTS
 - Generation is incomplete if auth rules, runtime rules, and validation rules describe different truth paths.
 - Generation is incomplete if buildability is broken.
 - If buildability cannot be checked because dependencies are missing, report that state explicitly; do not report a green result for buildability.
+- Generation is incomplete if the **API error contract** (ValidationPipe + `ApiExceptionFilter` + client `dataProvider` + DSL-derived `field-labels.generated.ts`) drifts from `prompts/validation-rules.md` without an explicit exception.
 
 VALIDATION
 
