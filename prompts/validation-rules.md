@@ -30,6 +30,7 @@ Validation is now a lightweight automated gate instead of a prose-only checklist
 - generation must not pass validation if framework scaffolding files were deleted and replaced by a hand-written minimal skeleton
 - if dependencies are installed, build verification runs for `server/` and `client/`
 - if dependencies are missing, build verification is reported as skipped with reason instead of green
+- `server/package.json` and `client/package.json`: every entry in `dependencies`, `devDependencies`, `optionalDependencies`, and `peerDependencies` must use an exact version string (no `^` or `~` prefix)
 
 ### Auth checks
 

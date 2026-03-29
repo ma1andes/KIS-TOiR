@@ -2,6 +2,7 @@
   "name": "toir-generation-context",
   "private": true,
   "scripts": {
+    "pin:deps": "node tools/pin-package-versions.mjs server && node tools/pin-package-versions.mjs client",
     "generate:domain-summary": "node tools/generate-domain-summary.mjs",
     "validate:generation": "node tools/validate-generation.mjs",
     "validate:generation:runtime": "node tools/validate-generation.mjs --run-runtime",

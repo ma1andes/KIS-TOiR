@@ -181,6 +181,26 @@ function validateBuildChecks() {
     assertCondition(Boolean(clientPackage.devDependencies?.vite), 'client/package.json must keep Vite as a dev dependency');
     assertCondition(Boolean(clientPackage.devDependencies?.['@vitejs/plugin-react']), 'client/package.json must keep @vitejs/plugin-react as a dev dependency');
   }
+
+  validatePinnedPackageJsonVersions();
+}
+
+function validatePinnedPackageJsonVersions() {
+  for (const rel of ['server/package.json', 'client/package.json']) {
+    const pkg = parseJson(rel);
+    if (!pkg) continue;
+    for (const section of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
+      const deps = pkg[section];
+      if (!deps || typeof deps !== 'object') continue;
+      for (const [name, ver] of Object.entries(deps)) {
+        if (typeof ver !== 'string') continue;
+        assertCondition(
+          !/^[\^~]/.test(ver),
+          `${rel} ${section}.${name} must be pinned (no ^ or ~): got ${ver}`,
+        );
+      }
+    }
+  }
 }
 
 function validateAuthChecks() {
